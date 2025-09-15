@@ -8,8 +8,12 @@ var builder = WebApplication.CreateBuilder(args);
 // ===== SERVICES CONFIGURATION =====
 // DI Container'a servisleri ekle
 
-// MVC Controllers ekle
-builder.Services.AddControllers();
+// MVC Controllers ekle - FluentValidation ile birlikte
+builder.Services.AddControllers()
+    .AddFluentValidation(config =>
+    {
+        config.RegisterValidatorsFromAssemblyContaining<TodoApp.Application.Validators.CreateTodoDtoValidator>();
+    });
 
 // API Explorer ve Swagger/OpenAPI konfigürasyonu
 builder.Services.AddEndpointsApiExplorer();
@@ -29,11 +33,6 @@ builder.Services.AddSwaggerGen(c =>
         c.IncludeXmlComments(xmlPath);
     }
 });
-
-// FluentValidation konfigürasyonu
-// Model validation'ı otomatik yapar
-builder.Services.AddFluentValidationAutoValidation();
-builder.Services.AddFluentValidationClientsideAdapters();
 
 // Custom servisleri ekle (N-Layer Architecture)
 builder.Services.AddApplication(); // Application katmanı servisleri
