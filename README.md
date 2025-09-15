@@ -98,7 +98,7 @@ dotnet run
 - **Swagger UI**: `https://localhost:7000`
 - **API Base URL**: `https://localhost:7000/api`
 
-## 🎓 Stajyerler İçin Öğrenme Rehberi
+## 🎓  Öğrenme Rehberi
 
 ### 1. Domain Katmanı (İş Kuralları)
 - **Entities**: Veri modellerini inceleyin (`Todo.cs`)
@@ -203,7 +203,7 @@ Proje SQL Server LocalDB kullanır. Connection string `appsettings.json` dosyas�
 - ✅ **Dependency Injection** - IoC container
 - ✅ **Repository Pattern** - Veri erişim deseni
 
-## 🎯 Stajyerler İçin Hedefler
+## 🎯  Hedefler
 
 Bu projeyi inceledikten sonra şunları öğrenmiş olacaksınız:
 
