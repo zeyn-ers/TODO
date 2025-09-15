@@ -2,12 +2,16 @@ using FluentValidation.AspNetCore;
 using TodoApp.Application;
 using TodoApp.Infrastructure;
 
+// WebApplication Builder oluştur - .NET 6+ minimal hosting model
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// ===== SERVICES CONFIGURATION =====
+// DI Container'a servisleri ekle
+
+// MVC Controllers ekle
 builder.Services.AddControllers();
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+// API Explorer ve Swagger/OpenAPI konfigürasyonu
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -17,7 +21,7 @@ builder.Services.AddSwaggerGen(c =>
         Description = "A simple Todo API built with N-Layer Architecture"
     });
     
-    // Include XML comments
+    // XML yorumlarını Swagger'a dahil et (API dokümantasyonu için)
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
@@ -26,44 +30,55 @@ builder.Services.AddSwaggerGen(c =>
     }
 });
 
-// Add FluentValidation
+// FluentValidation konfigürasyonu
+// Model validation'ı otomatik yapar
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddFluentValidationClientsideAdapters();
 
-// Add custom services
-builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
+// Custom servisleri ekle (N-Layer Architecture)
+builder.Services.AddApplication(); // Application katmanı servisleri
+builder.Services.AddInfrastructure(builder.Configuration); // Infrastructure katmanı servisleri
 
-// Add CORS
+// CORS (Cross-Origin Resource Sharing) konfigürasyonu
+// Frontend uygulamalarının API'ye erişmesine izin verir
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        policy.AllowAnyOrigin()    // Tüm origin'lere izin ver
+              .AllowAnyMethod()    // Tüm HTTP metodlarına izin ver
+              .AllowAnyHeader();   // Tüm header'lara izin ver
     });
 });
 
+// ===== APPLICATION BUILD =====
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// ===== MIDDLEWARE PIPELINE =====
+// HTTP request pipeline'ını konfigüre et
+
+// Development ortamında Swagger UI'yi etkinleştir
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "TodoApp API V1");
-        c.RoutePrefix = string.Empty; // Swagger UI at root
+        c.RoutePrefix = string.Empty; // Swagger UI'yi root path'te göster
     });
 }
 
+// HTTPS yönlendirmesi (güvenlik için)
 app.UseHttpsRedirection();
 
+// CORS middleware'ini etkinleştir
 app.UseCors("AllowAll");
 
+// Authorization middleware (şu an kullanılmıyor ama gelecekte eklenebilir)
 app.UseAuthorization();
 
+// Controller endpoint'lerini map et
 app.MapControllers();
 
+// Uygulamayı başlat
 app.Run();
