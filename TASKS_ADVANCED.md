@@ -28,21 +28,134 @@ Bu görevleri tamamladıktan sonra şunları öğrenmiş olacaksınız:
 
 **Görev:** Kapsamlı kullanıcı yönetim sistemi oluşturun
 
-1. **User Entity** oluşturun:
-   - `Id`, `FirstName`, `LastName`, `Email`, `PasswordHash`
-   - `PhoneNumber`, `AvatarUrl`, `Bio`, `Location`
-   - `CreatedAt`, `LastLoginAt`, `IsActive`, `IsEmailVerified`
-   - `Role` (enum: SuperAdmin, Admin, Manager, User, Guest)
+#### 🎯 Kod Örneği - User Entity (Tamamlanmış)
 
-2. **UserProfile Entity** oluşturun:
-   - `UserId`, `DateOfBirth`, `Gender`, `Interests`, `Skills`
-   - `SocialMediaLinks`, `Preferences`
+```csharp
+// TodoApp.Domain/Entities/User.cs
+using System.ComponentModel.DataAnnotations;
 
-3. **UserSettings Entity** oluşturun:
+namespace TodoApp.Domain.Entities;
+
+/// <summary>
+/// User entity - Kullanıcı bilgilerini tutan ana entity
+/// </summary>
+public class User
+{
+    public int Id { get; set; }
+    
+    [Required]
+    [MaxLength(50)]
+    public string FirstName { get; set; } = string.Empty;
+    
+    [Required]
+    [MaxLength(50)]
+    public string LastName { get; set; } = string.Empty;
+    
+    [Required]
+    [MaxLength(100)]
+    public string Email { get; set; } = string.Empty;
+    
+    [Required]
+    public string PasswordHash { get; set; } = string.Empty;
+    
+    [MaxLength(20)]
+    public string? PhoneNumber { get; set; }
+    
+    [MaxLength(500)]
+    public string? AvatarUrl { get; set; }
+    
+    [MaxLength(1000)]
+    public string? Bio { get; set; }
+    
+    [MaxLength(100)]
+    public string? Location { get; set; }
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? LastLoginAt { get; set; }
+    public bool IsActive { get; set; } = true;
+    public bool IsEmailVerified { get; set; } = false;
+    public UserRole Role { get; set; } = UserRole.User;
+    
+    // Navigation Properties
+    public virtual UserProfile? Profile { get; set; }
+    public virtual UserSettings? Settings { get; set; }
+    public virtual ICollection<UserActivity> Activities { get; set; } = new List<UserActivity>();
+    public virtual ICollection<Todo> Todos { get; set; } = new List<Todo>();
+}
+
+/// <summary>
+/// User role enum - Kullanıcı rollerini tanımlar
+/// </summary>
+public enum UserRole
+{
+    SuperAdmin = 1,
+    Admin = 2,
+    Manager = 3,
+    User = 4,
+    Guest = 5
+}
+```
+
+#### 🎯 Kod Örneği - UserProfile Entity (Tamamlanmış)
+
+```csharp
+// TodoApp.Domain/Entities/UserProfile.cs
+using System.ComponentModel.DataAnnotations;
+
+namespace TodoApp.Domain.Entities;
+
+/// <summary>
+/// UserProfile entity - Kullanıcı profil bilgilerini tutar
+/// </summary>
+public class UserProfile
+{
+    public int Id { get; set; }
+    
+    [Required]
+    public int UserId { get; set; }
+    
+    public DateTime? DateOfBirth { get; set; }
+    
+    [MaxLength(20)]
+    public string? Gender { get; set; }
+    
+    [MaxLength(1000)]
+    public string? Interests { get; set; } // JSON format
+    
+    [MaxLength(1000)]
+    public string? Skills { get; set; } // JSON format
+    
+    [MaxLength(2000)]
+    public string? SocialMediaLinks { get; set; } // JSON format
+    
+    [MaxLength(2000)]
+    public string? Preferences { get; set; } // JSON format
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    
+    // Navigation Properties
+    public virtual User User { get; set; } = null!;
+}
+```
+
+#### 📝 Stajyer Görevi - UserSettings Entity
+
+**Sizin yapmanız gerekenler:**
+
+1. **UserSettings Entity** oluşturun:
    - `UserId`, `Theme`, `Language`, `Notifications`, `Privacy`
+   - Navigation property'leri ekleyin
+   - XML yorumları ekleyin
 
-4. **UserActivity Entity** oluşturun:
+2. **UserActivity Entity** oluşturun:
    - `UserId`, `Action`, `Description`, `IpAddress`, `UserAgent`, `Timestamp`
+   - Navigation property'leri ekleyin
+   - XML yorumları ekleyin
+
+3. **DbContext** güncelleyin:
+   - Yeni entity'leri DbSet olarak ekleyin
+   - OnModelCreating'de konfigürasyonları yapın
 
 **Beklenen Sonuç:** Kapsamlı kullanıcı yönetim sistemi oluşturuldu.
 
@@ -52,17 +165,125 @@ Bu görevleri tamamladıktan sonra şunları öğrenmiş olacaksınız:
 
 **Görev:** Hiyerarşik kategori sistemi oluşturun
 
-1. **Category Entity** güncelleyin:
-   - `ParentCategoryId` (self-referencing foreign key)
-   - `Level`, `Path`, `SortOrder`, `Icon`, `Color`
-   - `IsSystemCategory`, `UsageCount`
+#### 🎯 Kod Örneği - Category Entity (Tamamlanmış)
 
-2. **CategoryPermission Entity** oluşturun:
-   - `CategoryId`, `UserId`, `PermissionType` (Read, Write, Delete, Admin)
-   - `GrantedBy`, `GrantedAt`, `ExpiresAt`
+```csharp
+// TodoApp.Domain/Entities/Category.cs
+using System.ComponentModel.DataAnnotations;
 
-3. **CategoryTag Entity** oluşturun:
-   - `CategoryId`, `TagId` (many-to-many)
+namespace TodoApp.Domain.Entities;
+
+/// <summary>
+/// Category entity - Hiyerarşik kategori sistemi
+/// </summary>
+public class Category
+{
+    public int Id { get; set; }
+    
+    [Required]
+    [MaxLength(100)]
+    public string Name { get; set; } = string.Empty;
+    
+    [MaxLength(500)]
+    public string? Description { get; set; }
+    
+    // Self-referencing foreign key for hierarchy
+    public int? ParentCategoryId { get; set; }
+    
+    public int Level { get; set; } = 0;
+    
+    [MaxLength(500)]
+    public string Path { get; set; } = string.Empty; // e.g., "1/2/3"
+    
+    public int SortOrder { get; set; } = 0;
+    
+    [MaxLength(50)]
+    public string? Icon { get; set; }
+    
+    [MaxLength(7)]
+    public string? Color { get; set; } // Hex color
+    
+    public bool IsSystemCategory { get; set; } = false;
+    public int UsageCount { get; set; } = 0;
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    public bool IsActive { get; set; } = true;
+    
+    // Navigation Properties
+    public virtual Category? ParentCategory { get; set; }
+    public virtual ICollection<Category> SubCategories { get; set; } = new List<Category>();
+    public virtual ICollection<Todo> Todos { get; set; } = new List<Todo>();
+    public virtual ICollection<CategoryPermission> Permissions { get; set; } = new List<CategoryPermission>();
+    public virtual ICollection<CategoryTag> CategoryTags { get; set; } = new List<CategoryTag>();
+}
+```
+
+#### 🎯 Kod Örneği - CategoryPermission Entity (Tamamlanmış)
+
+```csharp
+// TodoApp.Domain/Entities/CategoryPermission.cs
+using System.ComponentModel.DataAnnotations;
+
+namespace TodoApp.Domain.Entities;
+
+/// <summary>
+/// CategoryPermission entity - Kategori izin yönetimi
+/// </summary>
+public class CategoryPermission
+{
+    public int Id { get; set; }
+    
+    [Required]
+    public int CategoryId { get; set; }
+    
+    [Required]
+    public int UserId { get; set; }
+    
+    [Required]
+    public PermissionType PermissionType { get; set; }
+    
+    [Required]
+    public int GrantedBy { get; set; }
+    
+    public DateTime GrantedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ExpiresAt { get; set; }
+    
+    // Navigation Properties
+    public virtual Category Category { get; set; } = null!;
+    public virtual User User { get; set; } = null!;
+    public virtual User GrantedByUser { get; set; } = null!;
+}
+
+/// <summary>
+/// Permission type enum - İzin türlerini tanımlar
+/// </summary>
+public enum PermissionType
+{
+    Read = 1,
+    Write = 2,
+    Delete = 3,
+    Admin = 4
+}
+```
+
+#### 📝 Stajyer Görevi - CategoryTag Entity
+
+**Sizin yapmanız gerekenler:**
+
+1. **CategoryTag Entity** oluşturun:
+   - `CategoryId`, `TagId` (many-to-many junction table)
+   - Navigation property'leri ekleyin
+   - XML yorumları ekleyin
+
+2. **DbContext** güncelleyin:
+   - Category entity konfigürasyonunu ekleyin
+   - Self-referencing ilişkiyi konfigüre edin
+   - CategoryPermission ve CategoryTag konfigürasyonlarını ekleyin
+
+3. **Seed Data** ekleyin:
+   - Hiyerarşik kategori yapısı oluşturun
+   - Örnek izinler ekleyin
 
 **Beklenen Sonuç:** Hiyerarşik ve izin tabanlı kategori sistemi oluşturuldu.
 
@@ -72,16 +293,127 @@ Bu görevleri tamamladıktan sonra şunları öğrenmiş olacaksınız:
 
 **Görev:** Gelişmiş etiket sistemi oluşturun
 
-1. **Tag Entity** güncelleyin:
-   - `ParentTagId` (self-referencing)
-   - `Aliases`, `Synonyms`, `UsageCount`, `PopularityScore`
-   - `IsSystemTag`, `Color`, `Icon`
+#### 🎯 Kod Örneği - Tag Entity (Tamamlanmış)
 
-2. **TagRelationship Entity** oluşturun:
-   - `ParentTagId`, `ChildTagId`, `RelationshipType` (Synonym, Related, SubTag)
+```csharp
+// TodoApp.Domain/Entities/Tag.cs
+using System.ComponentModel.DataAnnotations;
 
-3. **TagUsage Entity** oluşturun:
+namespace TodoApp.Domain.Entities;
+
+/// <summary>
+/// Tag entity - Gelişmiş etiket sistemi
+/// </summary>
+public class Tag
+{
+    public int Id { get; set; }
+    
+    [Required]
+    [MaxLength(50)]
+    public string Name { get; set; } = string.Empty;
+    
+    [MaxLength(500)]
+    public string? Description { get; set; }
+    
+    // Self-referencing for tag hierarchy
+    public int? ParentTagId { get; set; }
+    
+    [MaxLength(1000)]
+    public string? Aliases { get; set; } // JSON array of aliases
+    
+    [MaxLength(1000)]
+    public string? Synonyms { get; set; } // JSON array of synonyms
+    
+    public int UsageCount { get; set; } = 0;
+    public decimal PopularityScore { get; set; } = 0;
+    
+    public bool IsSystemTag { get; set; } = false;
+    
+    [MaxLength(7)]
+    public string? Color { get; set; } // Hex color
+    
+    [MaxLength(50)]
+    public string? Icon { get; set; }
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    public bool IsActive { get; set; } = true;
+    
+    // Navigation Properties
+    public virtual Tag? ParentTag { get; set; }
+    public virtual ICollection<Tag> SubTags { get; set; } = new List<Tag>();
+    public virtual ICollection<TagRelationship> ParentRelationships { get; set; } = new List<TagRelationship>();
+    public virtual ICollection<TagRelationship> ChildRelationships { get; set; } = new List<TagRelationship>();
+    public virtual ICollection<TagUsage> Usages { get; set; } = new List<TagUsage>();
+    public virtual ICollection<TodoTag> TodoTags { get; set; } = new List<TodoTag>();
+    public virtual ICollection<CategoryTag> CategoryTags { get; set; } = new List<CategoryTag>();
+}
+```
+
+#### 🎯 Kod Örneği - TagRelationship Entity (Tamamlanmış)
+
+```csharp
+// TodoApp.Domain/Entities/TagRelationship.cs
+using System.ComponentModel.DataAnnotations;
+
+namespace TodoApp.Domain.Entities;
+
+/// <summary>
+/// TagRelationship entity - Etiket ilişkilerini yönetir
+/// </summary>
+public class TagRelationship
+{
+    public int Id { get; set; }
+    
+    [Required]
+    public int ParentTagId { get; set; }
+    
+    [Required]
+    public int ChildTagId { get; set; }
+    
+    [Required]
+    public TagRelationshipType RelationshipType { get; set; }
+    
+    public decimal Strength { get; set; } = 1.0m; // Relationship strength (0-1)
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    
+    // Navigation Properties
+    public virtual Tag ParentTag { get; set; } = null!;
+    public virtual Tag ChildTag { get; set; } = null!;
+}
+
+/// <summary>
+/// Tag relationship type enum - Etiket ilişki türlerini tanımlar
+/// </summary>
+public enum TagRelationshipType
+{
+    Synonym = 1,    // Eş anlamlı
+    Related = 2,    // İlgili
+    SubTag = 3,     // Alt etiket
+    ParentTag = 4,  // Üst etiket
+    Alternative = 5 // Alternatif
+}
+```
+
+#### 📝 Stajyer Görevi - TagUsage Entity
+
+**Sizin yapmanız gerekenler:**
+
+1. **TagUsage Entity** oluşturun:
    - `TagId`, `EntityType`, `EntityId`, `UsedBy`, `UsedAt`
+   - Navigation property'leri ekleyin
+   - XML yorumları ekleyin
+
+2. **DbContext** güncelleyin:
+   - Tag entity konfigürasyonunu ekleyin
+   - Self-referencing ilişkiyi konfigüre edin
+   - TagRelationship ve TagUsage konfigürasyonlarını ekleyin
+
+3. **Repository Interface** oluşturun:
+   - `ITagRepository` interface'ini genişletin
+   - Gelişmiş sorgu metodları ekleyin
 
 **Beklenen Sonuç:** Gelişmiş etiket sistemi ve ilişkileri oluşturuldu.
 
@@ -91,18 +423,128 @@ Bu görevleri tamamladıktan sonra şunları öğrenmiş olacaksınız:
 
 **Görev:** Threaded yorum sistemi oluşturun
 
-1. **Comment Entity** güncelleyin:
-   - `ParentCommentId` (self-referencing for threading)
-   - `ThreadId`, `Level`, `Path`, `IsDeleted`, `DeletedAt`
-   - `LikeCount`, `DislikeCount`, `ReportCount`
+#### 🎯 Kod Örneği - Comment Entity (Tamamlanmış)
 
-2. **CommentReaction Entity** oluşturun:
-   - `CommentId`, `UserId`, `ReactionType` (Like, Dislike, Love, Angry)
-   - `CreatedAt`
+```csharp
+// TodoApp.Domain/Entities/Comment.cs
+using System.ComponentModel.DataAnnotations;
 
-3. **CommentReport Entity** oluşturun:
+namespace TodoApp.Domain.Entities;
+
+/// <summary>
+/// Comment entity - Threaded yorum sistemi
+/// </summary>
+public class Comment
+{
+    public int Id { get; set; }
+    
+    [Required]
+    [MaxLength(1000)]
+    public string Content { get; set; } = string.Empty;
+    
+    [Required]
+    public int TodoId { get; set; }
+    
+    [Required]
+    public int UserId { get; set; }
+    
+    // Self-referencing for threading
+    public int? ParentCommentId { get; set; }
+    
+    public int ThreadId { get; set; } // Root comment ID for grouping
+    public int Level { get; set; } = 0; // Thread level (0 = root, 1 = reply, etc.)
+    
+    [MaxLength(500)]
+    public string Path { get; set; } = string.Empty; // e.g., "1/2/3" for threading
+    
+    public bool IsDeleted { get; set; } = false;
+    public DateTime? DeletedAt { get; set; }
+    public int? DeletedBy { get; set; }
+    
+    public int LikeCount { get; set; } = 0;
+    public int DislikeCount { get; set; } = 0;
+    public int ReportCount { get; set; } = 0;
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    
+    // Navigation Properties
+    public virtual Todo Todo { get; set; } = null!;
+    public virtual User User { get; set; } = null!;
+    public virtual Comment? ParentComment { get; set; }
+    public virtual ICollection<Comment> Replies { get; set; } = new List<Comment>();
+    public virtual ICollection<CommentReaction> Reactions { get; set; } = new List<CommentReaction>();
+    public virtual ICollection<CommentReport> Reports { get; set; } = new List<CommentReport>();
+}
+```
+
+#### 🎯 Kod Örneği - CommentReaction Entity (Tamamlanmış)
+
+```csharp
+// TodoApp.Domain/Entities/CommentReaction.cs
+using System.ComponentModel.DataAnnotations;
+
+namespace TodoApp.Domain.Entities;
+
+/// <summary>
+/// CommentReaction entity - Yorum reaksiyonları
+/// </summary>
+public class CommentReaction
+{
+    public int Id { get; set; }
+    
+    [Required]
+    public int CommentId { get; set; }
+    
+    [Required]
+    public int UserId { get; set; }
+    
+    [Required]
+    public ReactionType ReactionType { get; set; }
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
+    // Navigation Properties
+    public virtual Comment Comment { get; set; } = null!;
+    public virtual User User { get; set; } = null!;
+}
+
+/// <summary>
+/// Reaction type enum - Reaksiyon türlerini tanımlar
+/// </summary>
+public enum ReactionType
+{
+    Like = 1,
+    Dislike = 2,
+    Love = 3,
+    Angry = 4,
+    Laugh = 5,
+    Sad = 6
+}
+```
+
+#### 📝 Stajyer Görevi - CommentReport Entity
+
+**Sizin yapmanız gerekenler:**
+
+1. **CommentReport Entity** oluşturun:
    - `CommentId`, `ReportedBy`, `Reason`, `Description`, `Status`
    - `ReportedAt`, `ResolvedAt`, `ResolvedBy`
+   - Navigation property'leri ekleyin
+   - XML yorumları ekleyin
+
+2. **DbContext** güncelleyin:
+   - Comment entity konfigürasyonunu ekleyin
+   - Self-referencing ilişkiyi konfigüre edin
+   - CommentReaction ve CommentReport konfigürasyonlarını ekleyin
+
+3. **Repository Interface** oluşturun:
+   - `ICommentRepository` interface'ini genişletin
+   - Threaded yorum sorguları için metodlar ekleyin
+
+4. **Service Layer** oluşturun:
+   - `ICommentService` interface'ini oluşturun
+   - Threaded yorum işlemleri için metodlar ekleyin
 
 **Beklenen Sonuç:** Threaded yorum sistemi ve reaksiyon sistemi oluşturuldu.
 
@@ -172,21 +614,173 @@ Bu görevleri tamamladıktan sonra şunları öğrenmiş olacaksınız:
 
 **Görev:** Gelişmiş repository pattern implementasyonu
 
-1. **Generic Repository** genişletme:
-   - `IQueryable<T>` dönen metodlar
-   - `Include` ve `ThenInclude` desteği
-   - `OrderBy` ve `GroupBy` desteği
+#### 🎯 Kod Örneği - Specification Pattern (Tamamlanmış)
 
-2. **Specification Pattern** implementasyonu:
-   - `ISpecification<T>` interface
-   - `BaseSpecification<T>` base class
-   - `SpecificationEvaluator` class
+```csharp
+// TodoApp.Domain/Interfaces/ISpecification.cs
+using System.Linq.Expressions;
 
-3. **Unit of Work Pattern** implementasyonu:
-   - `IUnitOfWork` interface
-   - `UnitOfWork` implementation
-   - Transaction management
+namespace TodoApp.Domain.Interfaces;
 
+/// <summary>
+/// Specification pattern interface - Gelişmiş sorgu yapıları için
+/// </summary>
+/// <typeparam name="T">Entity tipi</typeparam>
+public interface ISpecification<T>
+{
+    /// <summary>
+    /// Where koşulu
+    /// </summary>
+    Expression<Func<T, bool>>? Criteria { get; }
+    
+    /// <summary>
+    /// Include edilecek navigation property'ler
+    /// </summary>
+    List<Expression<Func<T, object>>> Includes { get; }
+    
+    /// <summary>
+    /// ThenInclude edilecek navigation property'ler
+    /// </summary>
+    List<string> IncludeStrings { get; }
+    
+    /// <summary>
+    /// OrderBy koşulu
+    /// </summary>
+    Expression<Func<T, object>>? OrderBy { get; }
+    
+    /// <summary>
+    /// OrderByDescending koşulu
+    /// </summary>
+    Expression<Func<T, object>>? OrderByDescending { get; }
+    
+    /// <summary>
+    /// ThenBy koşulu
+    /// </summary>
+    Expression<Func<T, object>>? ThenBy { get; }
+    
+    /// <summary>
+    /// ThenByDescending koşulu
+    /// </summary>
+    Expression<Func<T, object>>? ThenByDescending { get; }
+    
+    /// <summary>
+    /// Take (limit) değeri
+    /// </summary>
+    int Take { get; }
+    
+    /// <summary>
+    /// Skip (offset) değeri
+    /// </summary>
+    int Skip { get; }
+    
+    /// <summary>
+    /// Pagination aktif mi
+    /// </summary>
+    bool IsPagingEnabled { get; }
+}
+```
+
+#### 🎯 Kod Örneği - BaseSpecification (Tamamlanmış)
+
+```csharp
+// TodoApp.Domain/Interfaces/BaseSpecification.cs
+using System.Linq.Expressions;
+
+namespace TodoApp.Domain.Interfaces;
+
+/// <summary>
+/// Base specification class - Specification pattern implementasyonu
+/// </summary>
+/// <typeparam name="T">Entity tipi</typeparam>
+public abstract class BaseSpecification<T> : ISpecification<T>
+{
+    public Expression<Func<T, bool>>? Criteria { get; }
+    public List<Expression<Func<T, object>>> Includes { get; } = new();
+    public List<string> IncludeStrings { get; } = new();
+    public Expression<Func<T, object>>? OrderBy { get; private set; }
+    public Expression<Func<T, object>>? OrderByDescending { get; private set; }
+    public Expression<Func<T, object>>? ThenBy { get; private set; }
+    public Expression<Func<T, object>>? ThenByDescending { get; private set; }
+    public int Take { get; private set; }
+    public int Skip { get; private set; }
+    public bool IsPagingEnabled { get; private set; }
+
+    protected BaseSpecification()
+    {
+    }
+
+    protected BaseSpecification(Expression<Func<T, bool>> criteria)
+    {
+        Criteria = criteria;
+    }
+
+    /// <summary>
+    /// Include ekle
+    /// </summary>
+    protected virtual void AddInclude(Expression<Func<T, object>> includeExpression)
+    {
+        Includes.Add(includeExpression);
+    }
+
+    /// <summary>
+    /// Include string ekle
+    /// </summary>
+    protected virtual void AddInclude(string includeString)
+    {
+        IncludeStrings.Add(includeString);
+    }
+
+    /// <summary>
+    /// OrderBy ekle
+    /// </summary>
+    protected virtual void AddOrderBy(Expression<Func<T, object>> orderByExpression)
+    {
+        OrderBy = orderByExpression;
+    }
+
+    /// <summary>
+    /// OrderByDescending ekle
+    /// </summary>
+    protected virtual void AddOrderByDescending(Expression<Func<T, object>> orderByDescendingExpression)
+    {
+        OrderByDescending = orderByDescendingExpression;
+    }
+
+    /// <summary>
+    /// Pagination ayarla
+    /// </summary>
+    protected virtual void ApplyPaging(int skip, int take)
+    {
+        Skip = skip;
+        Take = take;
+        IsPagingEnabled = true;
+    }
+}
+```
+
+#### 📝 Stajyer Görevi - Unit of Work Pattern
+
+**Sizin yapmanız gerekenler:**
+
+1. **IUnitOfWork Interface** oluşturun:
+   - `IRepository<T>` metodları
+   - `SaveChangesAsync()` metodu
+   - `BeginTransactionAsync()` metodu
+   - `CommitTransactionAsync()` metodu
+   - `RollbackTransactionAsync()` metodu
+
+2. **UnitOfWork Implementation** oluşturun:
+   - `UnitOfWork` class'ını implement edin
+   - Transaction management ekleyin
+   - Repository'leri yönetin
+
+3. **SpecificationEvaluator** oluşturun:
+   - `SpecificationEvaluator<T>` class'ını oluşturun
+   - Specification'ları IQueryable'a dönüştürün
+
+4. **DependencyInjection** güncelleyin:
+   - UnitOfWork'ü DI container'a ekleyin
+   - Advanced repository'leri ekleyin
 
 **Beklenen Sonuç:** Gelişmiş repository pattern implementasyonu tamamlandı.
 
