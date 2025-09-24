@@ -10,54 +10,56 @@ namespace TodoApp.Infrastructure.Data;
 /// </summary>
 public class TodoDbContext : DbContext
 {
-    /// <summary>
-    /// Constructor - Dependency Injection ile DbContextOptions alır
-    /// Bu sayede connection string ve diğer veritabanı ayarları dışarıdan verilir
-    /// </summary>
-    /// <param name="options">Veritabanı konfigürasyon seçenekleri</param>
-    public TodoDbContext(DbContextOptions<TodoDbContext> options) : base(options)
-    {
-    }
+    public TodoDbContext(DbContextOptions<TodoDbContext> options) : base(options) { }
 
-    /// <summary>
-    /// Todos tablosunu temsil eden DbSet
-    /// Bu property üzerinden CRUD operasyonları yapılır
-    /// </summary>
-    public DbSet<Todo> Todos { get; set; }
+    // DbSet'ler
+    public DbSet<Todo> Todos { get; set; } = null!;
+    public DbSet<Category> Categories { get; set; } = null!;
 
-    /// <summary>
-    /// Model oluşturma konfigürasyonu
-    /// Bu metod, entity'lerin veritabanı tablolarına nasıl dönüştürüleceğini belirler
-    /// </summary>
-    /// <param name="modelBuilder">Model yapılandırıcı</param>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Todo entity'si için özel konfigürasyonlar
-        modelBuilder.Entity<Todo>(entity =>
+        /* ---- TODO ---- */
+        modelBuilder.Entity<Todo>(e =>
         {
-            // Primary Key tanımı
-            entity.HasKey(e => e.Id);
-            
-            // Title alanı: Zorunlu ve maksimum 200 karakter
-            entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
-            
-            // Description alanı: Opsiyonel ve maksimum 1000 karakter
-            entity.Property(e => e.Description).HasMaxLength(1000);
-            
-            // CreatedAt alanı: Zorunlu
-            entity.Property(e => e.CreatedAt).IsRequired();
-            
-            // Priority alanı: Varsayılan değer 1 (Düşük öncelik)
-            entity.Property(e => e.Priority).HasDefaultValue(1);
-            
-            // IsCompleted alanı: Varsayılan değer false (Bekliyor)
-            entity.Property(e => e.IsCompleted).HasDefaultValue(false);
+            e.ToTable("Todos");
+            e.HasKey(x => x.Id);
+
+            e.Property(x => x.Title).IsRequired().HasMaxLength(200);
+            e.Property(x => x.Description).HasMaxLength(1000);
+            e.Property(x => x.CreatedAt).IsRequired().HasDefaultValueSql("GETUTCDATE()");
+            e.Property(x => x.Priority).HasDefaultValue(1);
+            e.Property(x => x.IsCompleted).HasDefaultValue(false);
+
+            // N:1 ilişki (Todo → Category)
+            e.HasOne(x => x.Category)
+             .WithMany(c => c.Todos)
+             .HasForeignKey(x => x.CategoryId)
+             .OnDelete(DeleteBehavior.Restrict);
         });
 
-        // Seed Data - Veritabanı oluşturulduğunda örnek veriler eklenir
-        // Bu veriler, uygulamanın ilk çalıştırılmasında otomatik olarak eklenir
+        /* ---- CATEGORY ---- */
+        modelBuilder.Entity<Category>(e =>
+        {
+            e.ToTable("Categories");
+            e.HasKey(x => x.Id);
+
+            e.Property(x => x.Name).IsRequired().HasMaxLength(100);
+            e.Property(x => x.Description).HasMaxLength(500);
+            e.Property(x => x.IsActive).HasDefaultValue(true);
+            e.Property(x => x.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+        });
+
+        /* ---- SEED ---- */
+        // Category seed (sabit tarihler kullanıyoruz)
+        modelBuilder.Entity<Category>().HasData(
+            new Category { Id = 1, Name = "Genel", Description = "Genel görevler", IsActive = true, CreatedAt = new DateTime(2025, 09, 01, 0, 0, 0, DateTimeKind.Utc) },
+            new Category { Id = 2, Name = "İş",    Description = "İş ile ilgili görev", IsActive = true, CreatedAt = new DateTime(2025, 09, 01, 0, 0, 0, DateTimeKind.Utc) },
+            new Category { Id = 3, Name = "Acil",  Description = "Yüksek öncelik",      IsActive = true, CreatedAt = new DateTime(2025, 09, 01, 0, 0, 0, DateTimeKind.Utc) }
+        );
+
+        // Todo seed (CategoryId zorunlu)
         modelBuilder.Entity<Todo>().HasData(
             new Todo
             {
@@ -65,8 +67,9 @@ public class TodoDbContext : DbContext
                 Title = "İlk Todo",
                 Description = "Bu bir örnek todo'dur",
                 IsCompleted = false,
-                CreatedAt = DateTime.UtcNow,
-                Priority = 2
+                CreatedAt = new DateTime(2025, 09, 22, 0, 0, 0, DateTimeKind.Utc),
+                Priority = 2,
+                CategoryId = 1
             },
             new Todo
             {
@@ -74,9 +77,10 @@ public class TodoDbContext : DbContext
                 Title = "Tamamlanan Todo",
                 Description = "Bu todo tamamlanmıştır",
                 IsCompleted = true,
-                CreatedAt = DateTime.UtcNow.AddDays(-1),
-                UpdatedAt = DateTime.UtcNow,
-                Priority = 1
+                CreatedAt = new DateTime(2025, 09, 21, 0, 0, 0, DateTimeKind.Utc),
+                UpdatedAt = new DateTime(2025, 09, 22, 0, 0, 0, DateTimeKind.Utc),
+                Priority = 1,
+                CategoryId = 1
             }
         );
     }

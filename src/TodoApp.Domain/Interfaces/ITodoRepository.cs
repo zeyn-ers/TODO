@@ -34,4 +34,11 @@ public interface ITodoRepository : IRepository<Todo>
     /// </summary>
     /// <returns>Süresi geçmiş todo listesi</returns>
     Task<IEnumerable<Todo>> GetOverdueTodosAsync();
+
+    /// <summary>
+    /// Belirli kategoriye ait todo'ları getirir
+    /// </summary>
+    /// <param name="categoryId">Kategori ID'si</param>
+    /// <returns>Kategoriye ait todo listesi</returns>
+    Task<IEnumerable<Todo>> GetTodosByCategoryAsync(int categoryId);
 }

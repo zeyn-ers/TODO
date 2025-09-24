@@ -2,30 +2,27 @@ using AutoMapper;
 using TodoApp.Application.DTOs;
 using TodoApp.Domain.Entities;
 
-namespace TodoApp.Application.Mappings;
-
-/// <summary>
-/// AutoMapper Profile
-/// Entity ve DTO arasındaki dönüşüm kurallarını tanımlar
-/// AutoMapper, bu profile'ı kullanarak otomatik dönüşümler yapar
-/// </summary>
-public class MappingProfile : Profile
+namespace TodoApp.Application.Mapping
 {
-    /// <summary>
-    /// Constructor - Mapping kurallarını tanımlar
-    /// </summary>
-    public MappingProfile()
+    /// <summary>AutoMapper eşlemeleri</summary>
+    public sealed class MappingProfile : Profile
     {
-        // Todo Entity <-> TodoDto DTO dönüşümü (çift yönlü)
-        // ReverseMap() sayesinde hem Todo -> TodoDto hem de TodoDto -> Todo dönüşümü yapılır
-        CreateMap<Todo, TodoDto>().ReverseMap();
-        
-        // CreateTodoDto -> Todo Entity dönüşümü
-        // Yeni todo oluştururken kullanılır
-        CreateMap<CreateTodoDto, Todo>();
-        
-        // UpdateTodoDto -> Todo Entity dönüşümü
-        // Mevcut todo güncellerken kullanılır
-        CreateMap<UpdateTodoDto, Todo>();
+        public MappingProfile()
+        {
+            // Category ↔ DTO
+            CreateMap<Category, CategoryDto>();
+            CreateMap<CreateCategoryDto, Category>();
+            CreateMap<UpdateCategoryDto, Category>();
+
+            // Todo → TodoDto (Category alanlarını doldur)
+            CreateMap<Todo, TodoDto>()
+                .ForMember(d => d.CategoryId,   opt => opt.MapFrom(s => s.CategoryId))
+                .ForMember(d => d.CategoryName, opt => opt.MapFrom(s => s.Category != null ? s.Category.Name : null));
+
+            // Create/Update → Todo
+            CreateMap<CreateTodoDto, Todo>();
+            CreateMap<UpdateTodoDto, Todo>()
+                .ForAllMembers(opt => opt.Condition((src, dest, srcMember) => srcMember != null));
+        }
     }
 }

@@ -7,52 +7,23 @@ namespace TodoApp.Domain.Entities;
 /// </summary>
 public class Todo
 {
-    /// <summary>
-    /// Todo'nun benzersiz kimliği (Primary Key)
-    /// Veritabanında otomatik artan ID
-    /// </summary>
     public int Id { get; set; }
-
-    /// <summary>
-    /// Todo'nun başlığı - Zorunlu alan
-    /// Maksimum 200 karakter olabilir
-    /// </summary>
     public string Title { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Todo'nun detaylı açıklaması - Opsiyonel alan
-    /// Maksimum 1000 karakter olabilir
-    /// </summary>
     public string Description { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Todo'nun tamamlanma durumu
-    /// false: Bekliyor, true: Tamamlandı
-    /// </summary>
     public bool IsCompleted { get; set; }
-
-    /// <summary>
-    /// Todo'nun oluşturulma tarihi
-    /// Sistem tarafından otomatik set edilir
-    /// </summary>
     public DateTime CreatedAt { get; set; }
-
-    /// <summary>
-    /// Todo'nun son güncellenme tarihi
-    /// İlk oluşturulduğunda null, güncellemelerde set edilir
-    /// </summary>
     public DateTime? UpdatedAt { get; set; }
-
-    /// <summary>
-    /// Todo'nun bitiş tarihi - Opsiyonel
-    /// null olabilir, gelecek tarih olmalı
-    /// </summary>
     public DateTime? DueDate { get; set; }
+    public int Priority { get; set; } = 1;
+
+    // 🔗 Category ile ilişki
+    /// <summary>
+    /// Todo'nun bağlı olduğu kategori Id'si (Foreign Key)
+    /// </summary>
+    public int CategoryId { get; set; }
 
     /// <summary>
-    /// Todo'nun öncelik seviyesi
-    /// 1: Düşük, 2: Orta, 3: Yüksek
-    /// Varsayılan değer: 1 (Düşük)
+    /// Todo'nun kategorisi (Navigation property)
     /// </summary>
-    public int Priority { get; set; } = 1;
+    public Category? Category { get; set; }
 }

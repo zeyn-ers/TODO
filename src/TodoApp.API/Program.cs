@@ -1,83 +1,88 @@
+// Program.cs
+using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.EntityFrameworkCore;
 using TodoApp.Application;
+using TodoApp.Application.Mapping;
 using TodoApp.Infrastructure;
+using TodoApp.Infrastructure.Data;
 
-// WebApplication Builder oluştur - .NET 6+ minimal hosting model
 var builder = WebApplication.CreateBuilder(args);
 
-// ===== SERVICES CONFIGURATION =====
-// DI Container'a servisleri ekle
+// Controllers + FluentValidation + Anti-forgery
+builder.Services.AddControllers();
+builder.Services
+    .AddFluentValidationAutoValidation()
+    .AddFluentValidationClientsideAdapters();
 
-// MVC Controllers ekle - FluentValidation ile birlikte
-builder.Services.AddControllers()
-    .AddFluentValidation(config =>
-    {
-        config.RegisterValidatorsFromAssemblyContaining<TodoApp.Application.Validators.CreateTodoDtoValidator>();
-    });
-
-// API Explorer ve Swagger/OpenAPI konfigürasyonu
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+// Anti-forgery tokens for CSRF protection
+builder.Services.AddAntiforgery(options =>
 {
-    c.SwaggerDoc("v1", new() { 
-        Title = "TodoApp API", 
-        Version = "v1",
-        Description = "A simple Todo API built with N-Layer Architecture"
-    });
-    
-    // XML yorumlarını Swagger'a dahil et (API dokümantasyonu için)
-    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    if (File.Exists(xmlPath))
-    {
-        c.IncludeXmlComments(xmlPath);
-    }
+    options.HeaderName = "X-XSRF-TOKEN";
+    options.SuppressXFrameOptionsHeader = false;
 });
 
-// Custom servisleri ekle (N-Layer Architecture)
-builder.Services.AddApplication(); // Application katmanı servisleri
-builder.Services.AddInfrastructure(builder.Configuration); // Infrastructure katmanı servisleri
+// Validatorları tara (uygulamadaki bir validator tipinden keşfeder)
+builder.Services.AddValidatorsFromAssemblyContaining<TodoApp.Application.Validators.CreateTodoDtoValidator>();
 
-// CORS (Cross-Origin Resource Sharing) konfigürasyonu
-// Frontend uygulamalarının API'ye erişmesine izin verir
+// Swagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// App & Infra
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
+
+// AutoMapper
+builder.Services.AddAutoMapper(typeof(MappingProfile).Assembly);
+
+// CORS - More secure configuration
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin()    // Tüm origin'lere izin ver
-              .AllowAnyMethod()    // Tüm HTTP metodlarına izin ver
-              .AllowAnyHeader();   // Tüm header'lara izin ver
-    });
+    options.AddPolicy("AllowFrontend", p => p
+        .WithOrigins("http://localhost:4200", "https://localhost:4200")
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials());
 });
 
-// ===== APPLICATION BUILD =====
 var app = builder.Build();
 
-// ===== MIDDLEWARE PIPELINE =====
-// HTTP request pipeline'ını konfigüre et
+//
+// 🔧 DB şemasını otomatik güncelle (veriyi SİLMEZ)
+//    ve hangi DB'ye bağlı olduğunu logla
+//
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<TodoDbContext>();
+    db.Database.Migrate();
 
-// Development ortamında Swagger UI'yi etkinleştir
+    var cs = db.Database.GetDbConnection().ConnectionString;
+    app.Logger.LogInformation("✅ Connected DB: {ConnectionString}", cs);
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "TodoApp API V1");
-        c.RoutePrefix = string.Empty; // Swagger UI'yi root path'te göster
+        c.RoutePrefix = string.Empty;
     });
 }
 
-// HTTPS yönlendirmesi (güvenlik için)
 app.UseHttpsRedirection();
-
-// CORS middleware'ini etkinleştir
-app.UseCors("AllowAll");
-
-// Authorization middleware (şu an kullanılmıyor ama gelecekte eklenebilir)
+app.UseCors("AllowFrontend");
 app.UseAuthorization();
 
-// Controller endpoint'lerini map et
+// Add anti-forgery token endpoint
+app.MapGet("/api/antiforgery/token", (IAntiforgery forgery, HttpContext context) =>
+{
+    var tokens = forgery.GetAndStoreTokens(context);
+    return Results.Ok(new { token = tokens.RequestToken });
+});
+
 app.MapControllers();
 
-// Uygulamayı başlat
 app.Run();
