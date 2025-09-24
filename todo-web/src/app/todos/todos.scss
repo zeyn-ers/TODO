@@ -1,0 +1,20 @@
+.todos h3{ margin:0 0 14px; font-size:18px; font-weight:700; }
+.addbar{ display:flex; gap:10px; margin-bottom:14px; }
+.addbar .grow{ flex:1; }
+.catpick{ width:210px; }
+
+.list{ display:flex; flex-direction:column; gap:12px; }
+
+.todo{
+  display:flex; justify-content:space-between; align-items:flex-start;
+  padding:14px; border:1px solid var(--border); border-radius:12px;
+  background: var(--surface); box-shadow: var(--shadow); transition:.2s;
+}
+.todo:hover{ transform: translateY(-1px); }
+
+.left{ display:flex; gap:12px; align-items:flex-start; }
+.main .title{ font-weight:600; }
+.main .title.done{ color: var(--muted); text-decoration: line-through; opacity:.75; }
+.meta{ margin-top:6px; display:flex; gap:12px; font-size:12px; color: var(--muted); }
+.right button mat-icon{ color:#4b5563; }
+.right button[color="warn"] mat-icon{ color: var(--danger); }

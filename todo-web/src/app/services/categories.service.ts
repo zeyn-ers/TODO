@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject, signal, ApplicationRef } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { EMPTY, of } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
@@ -16,12 +16,20 @@ export interface CategoryDto {
 export class CategoriesService {
   private http = inject(HttpClient);
   private snack = inject(MatSnackBar);
+  private appRef = inject(ApplicationRef);
 
   readonly categories = signal<CategoryDto[]>([]);
 
+  private tick() {
+    this.appRef.tick();
+  }
+
   loadAll() {
     this.http.get<CategoryDto[]>('/api/categories').pipe(
-      tap(list => this.categories.set(list ?? [])),
+      tap(list => {
+        this.categories.set(list ?? []);
+        this.tick();
+      }),
       catchError(err => {
         this.snack.open(this.msg(err, 'Kategori listesi alınamadı'), 'Kapat', { duration: 1600 });
         return of([]);
@@ -34,16 +42,19 @@ export class CategoriesService {
     const optimistic: CategoryDto = { id: Date.now(), name: name.trim() };
 
     this.categories.set([optimistic, ...prev]);
+    this.tick();
 
     this.http.post<CategoryDto>('/api/categories', { name, isActive: true }).pipe(
       tap(saved => {
         const withReal = [saved, ...prev];
         this.categories.set(withReal);
         this.snack.open('Kategori eklendi', 'Kapat', { duration: 1200 });
+        this.tick();
       }),
       catchError(err => {
         this.categories.set(prev);
         this.snack.open(this.msg(err, 'Kategori eklenemedi'), 'Kapat', { duration: 1800 });
+        this.tick();
         return EMPTY;
       })
     ).subscribe();
@@ -53,12 +64,17 @@ export class CategoriesService {
     const prev = this.categories();
     const patched = prev.map(c => c.id === id ? { ...c, name } : c);
     this.categories.set(patched);
+    this.tick();
 
     this.http.put<CategoryDto>(`/api/categories/${id}`, { name, isActive: true }).pipe(
-      tap(() => this.snack.open('Kategori güncellendi', 'Kapat', { duration: 1200 })),
+      tap(() => {
+        this.snack.open('Kategori güncellendi', 'Kapat', { duration: 1200 });
+        this.tick();
+      }),
       catchError(err => {
         this.categories.set(prev);
         this.snack.open(this.msg(err, 'Kategori güncellenemedi'), 'Kapat', { duration: 1800 });
+        this.tick();
         return EMPTY;
       })
     ).subscribe();
@@ -68,12 +84,17 @@ export class CategoriesService {
     const prev = this.categories();
     const after = prev.filter(c => c.id !== id);
     this.categories.set(after);
+    this.tick();
 
     this.http.delete<void>(`/api/categories/${id}`).pipe(
-      tap(() => this.snack.open('Kategori silindi', 'Kapat', { duration: 1200 })),
+      tap(() => {
+        this.snack.open('Kategori silindi', 'Kapat', { duration: 1200 });
+        this.tick();
+      }),
       catchError(err => {
         this.categories.set(prev);
         this.snack.open(this.msg(err, 'Kategori silinemedi'), 'Kapat', { duration: 1800 });
+        this.tick();
         return EMPTY;
       })
     ).subscribe();

@@ -1,6 +1,7 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ApplicationRef } from '@angular/core';
 import { CommonModule, NgFor } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder } from '@angular/forms';
+
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -36,22 +37,22 @@ import { TodosService, TodoDto } from '../services/todos.service';
       <form [formGroup]="form" (ngSubmit)="onAdd()" class="row" style="margin:.5rem 0 1rem">
         <mat-form-field appearance="outline" class="spacer">
           <mat-label>Başlık</mat-label>
-          <input matInput formControlName="title" required />
+          <input matInput formControlName="title" placeholder="Yeni yapılacak…" required />
         </mat-form-field>
 
         <mat-form-field appearance="outline">
           <mat-label>Son tarih</mat-label>
           <input matInput [matDatepicker]="picker" formControlName="dueDate">
-          <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-datepicker-toggle matSuffix [for]="picker" aria-label="Tarih seçici"></mat-datepicker-toggle>
           <mat-datepicker #picker></mat-datepicker>
         </mat-form-field>
 
-        <button mat-raised-button color="primary" type="submit">Ekle</button>
+        <button mat-raised-button color="primary" type="submit" aria-label="Todo ekle">Ekle</button>
       </form>
 
       <mat-list>
-        <mat-list-item *ngFor="let t of todos()">
-          <mat-checkbox [checked]="t.isCompleted" (change)="onToggle(t)"></mat-checkbox>
+        <mat-list-item *ngFor="let t of todos(); trackBy: trackId">
+          <mat-checkbox [checked]="t.isCompleted" (change)="onToggle(t)" aria-label="Tamamlandı işareti"></mat-checkbox>
           <div matListItemTitle [style.textDecoration]="t.isCompleted ? 'line-through' : 'none'">
             {{ t.title }}
           </div>
@@ -74,9 +75,13 @@ export class TodosComponent implements OnInit {
   private svc = inject(TodosService);
   private fb  = inject(FormBuilder);
   private snack = inject(MatSnackBar);
+  private appRef = inject(ApplicationRef);
 
   todos = this.svc.todos;
   form = this.fb.nonNullable.group({ title: [''], dueDate: [null as Date | null] });
+
+  /** listelerde performans için */
+  trackId = (_: number, x: { id: number }) => x.id;
 
   ngOnInit() { this.svc.loadAll(); }
 
@@ -88,6 +93,7 @@ export class TodosComponent implements OnInit {
     const iso = v.dueDate ? new Date(v.dueDate).toISOString() : undefined;
     this.svc.add({ title, description: '', dueDate: iso, priority: 1 });
     this.form.reset();
+    this.appRef.tick();
   }
 
   onToggle(t: TodoDto) {

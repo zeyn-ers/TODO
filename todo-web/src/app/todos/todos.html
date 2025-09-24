@@ -1,1 +1,42 @@
-<p>todos works!</p>
+<div class="todos">
+  <h3>📝 ToDo'lar</h3>
+
+  <!-- giriş barı -->
+  <form [formGroup]="todoForm" (ngSubmit)="onAdd()" class="addbar">
+    <mat-form-field appearance="outline" class="grow">
+      <input matInput formControlName="title" placeholder="Bir şey yaz ve Enter’a bas…" />
+    </mat-form-field>
+
+    <!-- kategori seçici -->
+    <mat-form-field appearance="outline" class="catpick">
+      <mat-select formControlName="categoryId" placeholder="Kategori">
+        <mat-option [value]="null">Kategorisiz</mat-option>
+        <mat-option *ngFor="let c of categories()" [value]="c.id">
+          📁 {{ c.name }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <button mat-raised-button color="primary" type="submit">Ekle</button>
+  </form>
+
+  <!-- liste -->
+  <div class="list">
+    <article class="todo" *ngFor="let t of todos(); trackBy: trackId">
+      <div class="left">
+        <mat-checkbox [checked]="t.isDone" (change)="toggle(t)"></mat-checkbox>
+        <div class="main">
+          <div class="title" [class.done]="t.isDone">{{ t.title }}</div>
+          <div class="meta">
+            <span class="cat" *ngIf="t.categoryName">📁 {{ t.categoryName }}</span>
+            <span class="date">📅 {{ t.createdAt | date:'shortDate' }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="right">
+        <button mat-icon-button (click)="edit(t)"><mat-icon>edit</mat-icon></button>
+        <button mat-icon-button color="warn" (click)="remove(t)"><mat-icon>delete</mat-icon></button>
+      </div>
+    </article>
+  </div>
+</div>

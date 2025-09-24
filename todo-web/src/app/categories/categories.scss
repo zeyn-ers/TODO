@@ -1,0 +1,18 @@
+.cats h3{ margin:0 0 14px; font-size:18px; font-weight:700; }
+.addbar{ display:flex; gap:10px; margin-bottom:14px; }
+.addbar .grow{ flex:1; }
+
+.cat-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; max-height: calc(100vh - 220px); overflow:auto; }
+
+.cat-item{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 14px; border:1px solid var(--border); border-radius:12px;
+  background: linear-gradient(135deg, #fdfbfb, #f3f4f7);
+  transition: .2s ease; box-shadow: 0 2px 8px rgba(0,0,0,.03);
+}
+.cat-item:hover{ transform: translateY(-1px); border-color:#d7dae4; }
+.l{ display:flex; align-items:center; gap:10px; }
+.badge{ display:inline-grid; place-items:center; width:28px; height:28px; border-radius:8px; background: var(--primary-weak); font-size:16px; }
+.name{ font-weight:600; }
+.r button mat-icon{ color:#4b5563; }
+.r button[color="warn"] mat-icon{ color: var(--danger); }

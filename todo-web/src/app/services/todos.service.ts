@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, inject, signal, ChangeDetectorRef, ApplicationRef } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { EMPTY, of } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
@@ -38,12 +38,20 @@ export interface UpdateTodoDto {
 export class TodosService {
   private http = inject(HttpClient);
   private snack = inject(MatSnackBar);
+  private appRef = inject(ApplicationRef);
 
   readonly todos = signal<TodoDto[]>([]);
 
+  private tick() {
+    this.appRef.tick();
+  }
+
   loadAll() {
     this.http.get<TodoDto[]>('/api/todos').pipe(
-      tap(list => this.todos.set(list ?? [])),
+      tap(list => {
+        this.todos.set(list ?? []);
+        this.tick();
+      }),
       catchError(err => {
         this.snack.open(this.msg(err, 'Todo listesi alınamadı'), 'Kapat', { duration: 1600 });
         return of([]);
@@ -56,6 +64,7 @@ export class TodosService {
       tap(created => {
         this.todos.set([created, ...this.todos()]);
         this.snack.open('Todo eklendi', 'Kapat', { duration: 1200 });
+        this.tick();
       }),
       catchError(err => {
         this.snack.open(this.msg(err, 'Todo eklenemedi'), 'Kapat', { duration: 1800 });
@@ -68,16 +77,19 @@ export class TodosService {
     const prev = this.todos();
     const patched = prev.map(t => t.id === id ? { ...t, ...dto } : t);
     this.todos.set(patched);
+    this.tick();
 
     this.http.put<TodoDto>(`/api/todos/${id}`, dto).pipe(
       tap(updated => {
         const list = this.todos().map(t => t.id === id ? updated : t);
         this.todos.set(list);
         this.snack.open('Todo güncellendi', 'Kapat', { duration: 1200 });
+        this.tick();
       }),
       catchError(err => {
         this.todos.set(prev);
         this.snack.open(this.msg(err, 'Todo güncellenemedi'), 'Kapat', { duration: 1800 });
+        this.tick();
         return EMPTY;
       })
     ).subscribe();
@@ -99,55 +111,22 @@ export class TodosService {
     this.update(id, dto);
   }
 
-  markCompleted(id: number) {
-    this.http.patch<TodoDto>(`/api/todos/${id}/complete`, {}).pipe(
-      tap(updated => {
-        const list = this.todos().map(t => t.id === id ? updated : t);
-        this.todos.set(list);
-        this.snack.open('Todo tamamlandı', 'Kapat', { duration: 1200 });
-      }),
-      catchError(err => {
-        this.snack.open(this.msg(err, 'Todo tamamlanamadı'), 'Kapat', { duration: 1800 });
-        return EMPTY;
-      })
-    ).subscribe();
-  }
-
-  markPending(id: number) {
-    this.http.patch<TodoDto>(`/api/todos/${id}/pending`, {}).pipe(
-      tap(updated => {
-        const list = this.todos().map(t => t.id === id ? updated : t);
-        this.todos.set(list);
-        this.snack.open('Todo beklemede', 'Kapat', { duration: 1200 });
-      }),
-      catchError(err => {
-        this.snack.open(this.msg(err, 'Todo güncellenemedi'), 'Kapat', { duration: 1800 });
-        return EMPTY;
-      })
-    ).subscribe();
-  }
-
   remove(id: number) {
     const prev = this.todos();
     const after = prev.filter(t => t.id !== id);
     this.todos.set(after);
+    this.tick();
 
     this.http.delete<void>(`/api/todos/${id}`).pipe(
-      tap(() => this.snack.open('Todo silindi', 'Kapat', { duration: 1200 })),
+      tap(() => {
+        this.snack.open('Todo silindi', 'Kapat', { duration: 1200 });
+        this.tick();
+      }),
       catchError(err => {
         this.todos.set(prev);
         this.snack.open(this.msg(err, 'Todo silinemedi'), 'Kapat', { duration: 1800 });
+        this.tick();
         return EMPTY;
-      })
-    ).subscribe();
-  }
-
-  loadByCategory(categoryId: number) {
-    this.http.get<TodoDto[]>(`/api/todos/by-category/${categoryId}`).pipe(
-      tap(list => this.todos.set(list ?? [])),
-      catchError(err => {
-        this.snack.open(this.msg(err, 'Kategori todoları alınamadı'), 'Kapat', { duration: 1600 });
-        return of([]);
       })
     ).subscribe();
   }

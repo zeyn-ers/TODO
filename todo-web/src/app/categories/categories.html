@@ -1,23 +1,27 @@
-<mat-card>
-  <mat-card-header>
-    <mat-card-title>Kategoriler</mat-card-title>
-  </mat-card-header>
+<div class="cats">
+  <h3>🗂️ Kategoriler</h3>
 
-  <mat-card-content>
-    <div *ngIf="loading">Yükleniyor…</div>
-    <div *ngIf="error" style="color:#b00020">{{ error }}</div>
+  <form [formGroup]="catForm" (ngSubmit)="onAdd()" class="addbar">
+    <mat-form-field appearance="outline" class="grow">
+      <input matInput formControlName="name" placeholder="Yeni kategori adı…" />
+    </mat-form-field>
+    <button mat-raised-button color="primary" type="submit">＋ Ekle</button>
+  </form>
 
-    <ul *ngIf="!loading && !error">
-      <li *ngFor="let c of categories">
-        <strong>{{ c.name }}</strong>
-        <span *ngIf="!c.isActive" style="color:#b00020">(pasif)</span>
-        <div style="color:#666">{{ c.description }}</div>
-        <small>{{ c.createdAt | date:'short' }}</small>
-      </li>
-    </ul>
-  </mat-card-content>
-
-  <mat-card-actions>
-    <button mat-stroked-button color="primary" (click)="fetch()">Yenile</button>
-  </mat-card-actions>
-</mat-card>
+  <ul class="cat-list">
+    <li *ngFor="let c of categories(); trackBy: trackId" class="cat-item">
+      <div class="l">
+        <span class="badge">📁</span>
+        <span class="name">{{ c.name }}</span>
+      </div>
+      <div class="r">
+        <button mat-icon-button (click)="onEdit(c)" aria-label="Düzenle">
+          <mat-icon>edit</mat-icon>
+        </button>
+        <button mat-icon-button color="warn" (click)="onDelete(c)" aria-label="Sil">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </div>
+    </li>
+  </ul>
+</div>
