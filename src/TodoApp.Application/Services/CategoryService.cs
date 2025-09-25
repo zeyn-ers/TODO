@@ -1,86 +1,96 @@
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using AutoMapper;
+using Microsoft.Extensions.Logging;
 using TodoApp.Application.DTOs;
 using TodoApp.Application.Interfaces;
 using TodoApp.Domain.Entities;
 using TodoApp.Domain.Interfaces;
 
-namespace TodoApp.Application.Services
+namespace TodoApp.Application.Services;
+
+/// <summary>
+/// Category service implementasyonu
+/// Category ile ilgili iş mantığını yönetir
+/// </summary>
+public class CategoryService : ICategoryService
 {
-    /// <summary>Category alanı uygulama servisi</summary>
-    public sealed class CategoryService : ICategoryService
+    private readonly ICategoryRepository _categoryRepository;
+    private readonly IMapper _mapper;
+    private readonly ILogger<CategoryService> _logger;
+
+    public CategoryService(ICategoryRepository categoryRepository, IMapper mapper, ILogger<CategoryService> logger)
     {
-        private readonly ICategoryRepository _repo;
-        private readonly IMapper _mapper;
+        _categoryRepository = categoryRepository;
+        _mapper = mapper;
+        _logger = logger;
+    }
 
-        public CategoryService(ICategoryRepository repo, IMapper mapper)
+    public async Task<IEnumerable<CategoryDto>> GetAllCategoriesAsync()
+    {
+        var categories = await _categoryRepository.GetAllAsync();
+        return _mapper.Map<IEnumerable<CategoryDto>>(categories);
+    }
+
+    public async Task<CategoryDto?> GetCategoryByIdAsync(int id)
+    {
+        var category = await _categoryRepository.GetByIdAsync(id);
+        return category == null ? null : _mapper.Map<CategoryDto>(category);
+    }
+
+    public async Task<IEnumerable<CategoryDto>> GetActiveCategoriesAsync()
+    {
+        var categories = await _categoryRepository.GetActiveCategoriesAsync();
+        return _mapper.Map<IEnumerable<CategoryDto>>(categories);
+    }
+
+    public async Task<CategoryDto> CreateCategoryAsync(CreateCategoryDto createDto)
+    {
+        try
         {
-            _repo = repo;
-            _mapper = mapper;
+            _logger.LogInformation("Creating category: {CategoryName}", createDto.Name);
+            var category = _mapper.Map<Category>(createDto);
+            category.CreatedAt = DateTime.UtcNow;
+            
+            var createdCategory = await _categoryRepository.AddAsync(category);
+            _logger.LogInformation("Category created successfully with ID: {CategoryId}", createdCategory.Id);
+            return _mapper.Map<CategoryDto>(createdCategory);
         }
-
-        public async Task<IEnumerable<CategoryDto>> GetAllAsync()
+        catch (Exception ex)
         {
-            var items = await _repo.GetAllAsync();
-            return items.Select(_mapper.Map<CategoryDto>);
+            _logger.LogError(ex, "Failed to create category: {CategoryName}", createDto.Name);
+            throw;
         }
+    }
 
-        public async Task<IEnumerable<CategoryDto>> GetActiveAsync()
+    public async Task<CategoryDto?> UpdateCategoryAsync(int id, UpdateCategoryDto updateDto)
+    {
+        var existingCategory = await _categoryRepository.GetByIdAsync(id);
+        if (existingCategory == null) return null;
+
+        _mapper.Map(updateDto, existingCategory);
+        await _categoryRepository.UpdateAsync(existingCategory);
+        return _mapper.Map<CategoryDto>(existingCategory);
+    }
+
+    public async Task<bool> DeleteCategoryAsync(int id)
+    {
+        var category = await _categoryRepository.GetByIdAsync(id);
+        if (category == null) return false;
+
+        await _categoryRepository.DeleteAsync(category.Id);
+        return true;
+    }
+
+    public async Task<PagedResult<CategoryDto>> GetPagedCategoriesAsync(PaginationParameters parameters)
+    {
+        var (items, totalCount) = await _categoryRepository.GetPagedAsync(parameters.PageNumber, parameters.PageSize);
+        var categoryDtos = _mapper.Map<IEnumerable<CategoryDto>>(items);
+        
+        return new PagedResult<CategoryDto>
         {
-            var items = await _repo.GetActiveCategoriesAsync();
-            return items.Select(_mapper.Map<CategoryDto>);
-        }
-
-        public async Task<CategoryDto?> GetByIdAsync(int id)
-        {
-            var entity = await _repo.GetByIdAsync(id);
-            return entity is null ? null : _mapper.Map<CategoryDto>(entity);
-        }
-
-        public async Task<CategoryDto?> GetByNameAsync(string name)
-        {
-            var entity = await _repo.GetCategoryByNameAsync(name);
-            return entity is null ? null : _mapper.Map<CategoryDto>(entity);
-        }
-
-        public async Task<CategoryDto> CreateAsync(CreateCategoryDto dto)
-        {
-            // aynı isimde kategori var mı? (opsiyonel kontrol)
-            var exists = await _repo.GetCategoryByNameAsync(dto.Name);
-            if (exists is not null)
-                throw new System.InvalidOperationException($"Category '{dto.Name}' already exists.");
-
-            var entity = _mapper.Map<Category>(dto);
-            await _repo.AddAsync(entity);                 
-            return _mapper.Map<CategoryDto>(entity);
-        }
-
-        public async Task<CategoryDto?> UpdateAsync(int id, UpdateCategoryDto dto)
-        {
-            var entity = await _repo.GetByIdAsync(id);
-            if (entity is null) return null;
-
-            if (!string.Equals(entity.Name, dto.Name, System.StringComparison.OrdinalIgnoreCase))
-            {
-                var byName = await _repo.GetCategoryByNameAsync(dto.Name);
-                if (byName is not null && byName.Id != id)
-                    throw new System.InvalidOperationException($"Category '{dto.Name}' already exists.");
-            }
-
-            _mapper.Map(dto, entity);
-            await _repo.UpdateAsync(entity);             
-            return _mapper.Map<CategoryDto>(entity);
-        }
-
-        public async Task<bool> DeleteAsync(int id)
-        {
-            var entity = await _repo.GetByIdAsync(id);
-            if (entity is null) return false;
-
-            await _repo.DeleteAsync(id);                 
-            return true;
-        }
+            Data = categoryDtos,
+            TotalCount = totalCount,
+            PageNumber = parameters.PageNumber,
+            PageSize = parameters.PageSize
+        };
     }
 }

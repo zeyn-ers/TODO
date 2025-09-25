@@ -1,7 +1,6 @@
 import { Component, OnInit, inject, ApplicationRef } from '@angular/core';
-import { CommonModule, NgFor } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder } from '@angular/forms';
-
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -9,9 +8,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatNativeDateModule } from '@angular/material/core';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatChipsModule } from '@angular/material/chips';
+import { MatPaginatorModule } from '@angular/material/paginator';
 
 import { TodosService, TodoDto } from '../services/todos.service';
 
@@ -19,105 +17,125 @@ import { TodosService, TodoDto } from '../services/todos.service';
   selector: 'app-todos',
   standalone: true,
   imports: [
-    CommonModule, ReactiveFormsModule, NgFor,
+    CommonModule, ReactiveFormsModule,
     MatCardModule, MatFormFieldModule, MatInputModule,
-    MatButtonModule, MatIconModule, MatListModule,
-    MatCheckboxModule, MatDatepickerModule, MatNativeDateModule,
-    MatSnackBarModule
+    MatButtonModule, MatIconModule, MatListModule, MatCheckboxModule,
+    MatChipsModule, MatPaginatorModule
   ],
-  styles: [`
-    .row { display:flex; gap:.5rem; align-items:center; }
-    .spacer { flex:1; }
-  `],
   template: `
   <mat-card>
     <mat-card-title>ToDo'lar</mat-card-title>
     <mat-card-content>
+      <!-- Filtre Butonları -->
+      <mat-chip-set style="margin-bottom:16px">
+        <mat-chip (click)="loadAll()" [highlighted]="currentView === 'all'">Tümü</mat-chip>
+        <mat-chip (click)="loadCompleted()" [highlighted]="currentView === 'completed'">Tamamlanan</mat-chip>
+        <mat-chip (click)="loadPending()" [highlighted]="currentView === 'pending'">Bekleyen</mat-chip>
+        <mat-chip (click)="loadPaged()" [highlighted]="currentView === 'paged'">Sayfalı (V2)</mat-chip>
+      </mat-chip-set>
 
-      <form [formGroup]="form" (ngSubmit)="onAdd()" class="row" style="margin:.5rem 0 1rem">
-        <mat-form-field appearance="outline" class="spacer">
-          <mat-label>Başlık</mat-label>
-          <input matInput formControlName="title" placeholder="Yeni yapılacak…" required />
+      <form [formGroup]="form" (ngSubmit)="onAdd()" style="display:flex;gap:8px;margin-bottom:16px">
+        <mat-form-field appearance="outline" style="flex:1">
+          <mat-label>Yeni todo</mat-label>
+          <input matInput formControlName="title" required />
         </mat-form-field>
-
-        <mat-form-field appearance="outline">
-          <mat-label>Son tarih</mat-label>
-          <input matInput [matDatepicker]="picker" formControlName="dueDate">
-          <mat-datepicker-toggle matSuffix [for]="picker" aria-label="Tarih seçici"></mat-datepicker-toggle>
-          <mat-datepicker #picker></mat-datepicker>
-        </mat-form-field>
-
-        <button mat-raised-button color="primary" type="submit" aria-label="Todo ekle">Ekle</button>
+        <button mat-raised-button color="primary" type="submit">Ekle</button>
       </form>
 
-      <mat-list>
-        <mat-list-item *ngFor="let t of todos(); trackBy: trackId">
-          <mat-checkbox [checked]="t.isCompleted" (change)="onToggle(t)" aria-label="Tamamlandı işareti"></mat-checkbox>
+      <!-- Sayfalı Görünüm -->
+      <div *ngIf="currentView === 'paged' && pagedTodos()">
+        <p>Toplam: {{pagedTodos()?.totalCount}} | Sayfa: {{pagedTodos()?.pageNumber}}/{{pagedTodos()?.totalPages}}</p>
+        <mat-list>
+          <mat-list-item *ngFor="let t of pagedTodos()?.items">
+            <mat-checkbox [checked]="t.isCompleted" (change)="onToggle(t)"></mat-checkbox>
+            <div matListItemTitle [style.textDecoration]="t.isCompleted ? 'line-through' : 'none'">
+              {{ t.title }}
+            </div>
+            <button mat-icon-button (click)="onDelete(t)" color="warn">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </mat-list-item>
+        </mat-list>
+        <mat-paginator 
+          [length]="pagedTodos()?.totalCount || 0"
+          [pageSize]="10"
+          [pageIndex]="(pagedTodos()?.pageNumber || 1) - 1"
+          (page)="onPageChange($event)">
+        </mat-paginator>
+      </div>
+
+      <!-- Normal Görünüm -->
+      <mat-list *ngIf="currentView !== 'paged'">
+        <mat-list-item *ngFor="let t of todos()">
+          <mat-checkbox [checked]="t.isCompleted" (change)="onToggle(t)"></mat-checkbox>
           <div matListItemTitle [style.textDecoration]="t.isCompleted ? 'line-through' : 'none'">
             {{ t.title }}
           </div>
-          <div matListItemLine *ngIf="t.dueDate as d">Son tarih: {{ d | date:'mediumDate' }}</div>
-          <span class="spacer"></span>
-          <button mat-icon-button (click)="onQuickEdit(t)" aria-label="Düzenle">
-            <mat-icon>edit</mat-icon>
-          </button>
-          <button mat-icon-button color="warn" (click)="onDelete(t)" aria-label="Sil">
+          <button mat-icon-button (click)="onDelete(t)" color="warn">
             <mat-icon>delete</mat-icon>
           </button>
         </mat-list-item>
       </mat-list>
-
     </mat-card-content>
   </mat-card>
   `
 })
 export class TodosComponent implements OnInit {
   private svc = inject(TodosService);
-  private fb  = inject(FormBuilder);
-  private snack = inject(MatSnackBar);
+  private fb = inject(FormBuilder);
   private appRef = inject(ApplicationRef);
 
   todos = this.svc.todos;
-  form = this.fb.nonNullable.group({ title: [''], dueDate: [null as Date | null] });
+  pagedTodos = this.svc.pagedTodos;
+  form = this.fb.nonNullable.group({ title: [''] });
+  currentView: 'all' | 'completed' | 'pending' | 'paged' = 'all';
 
-  /** listelerde performans için */
-  trackId = (_: number, x: { id: number }) => x.id;
+  ngOnInit() {
+    this.loadAll();
+  }
 
-  ngOnInit() { this.svc.loadAll(); }
+  loadAll() {
+    this.currentView = 'all';
+    this.svc.loadAll();
+  }
+
+  loadCompleted() {
+    this.currentView = 'completed';
+    this.svc.loadCompleted();
+  }
+
+  loadPending() {
+    this.currentView = 'pending';
+    this.svc.loadPending();
+  }
+
+  loadPaged() {
+    this.currentView = 'paged';
+    this.svc.loadPaged(1, 10);
+  }
+
+  onPageChange(event: any) {
+    this.svc.loadPaged(event.pageIndex + 1, event.pageSize);
+  }
 
   onAdd() {
-    const v = this.form.value;
-    const title = (v.title || '').trim();
+    const title = this.form.value.title?.trim();
     if (!title) return;
-
-    const iso = v.dueDate ? new Date(v.dueDate).toISOString() : undefined;
-    this.svc.add({ title, description: '', dueDate: iso, priority: 1 });
+    
+    this.svc.add({ title, description: '', priority: 1 });
     this.form.reset();
     this.appRef.tick();
   }
 
   onToggle(t: TodoDto) {
     this.svc.toggle(t.id);
-  }
-
-  onQuickEdit(t: TodoDto) {
-    const title = prompt('Yeni başlık:', t.title);
-    if (title != null && title.trim() && title !== t.title) {
-      this.svc.update(t.id, {
-        title: title.trim(),
-        description: t.description,
-        isCompleted: t.isCompleted,
-        dueDate: t.dueDate,
-        priority: t.priority,
-        categoryId: t.categoryId
-      });
-    }
+    this.appRef.tick();
   }
 
   onDelete(t: TodoDto) {
-    if (confirm(`Silinsin mi?\n- ${t.title}`)) {
+    if (confirm(`Sil: ${t.title}?`)) {
       this.svc.remove(t.id);
-      this.snack.open('ToDo silindi', 'Kapat', { duration: 1200, panelClass: ['snack-warn'] });
+      this.appRef.tick();
     }
   }
 }

@@ -2,10 +2,14 @@ using Microsoft.AspNetCore.Mvc;
 using TodoApp.Application.DTOs;
 using TodoApp.Application.Interfaces;
 
-namespace TodoApp.API.Controllers;
+namespace TodoApp.API.Controllers.V2;
 
+/// <summary>
+/// Todos Controller V2 - Gelişmiş özellikler ile
+/// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("2.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 public class TodosController : ControllerBase
 {
     private readonly ITodoService _todoService;
@@ -17,23 +21,47 @@ public class TodosController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>HTTP GET /api/todos</summary>
+    /// <summary>Filtreleme ve sıralama ile todo'ları getirir (V2 özelliği)</summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<TodoDto>>> GetAll()
+    public async Task<ActionResult<IEnumerable<TodoDto>>> GetFiltered(
+        [FromQuery] int? categoryId = null,
+        [FromQuery] bool? done = null,
+        [FromQuery] string? sort = null,
+        [FromQuery] bool include = false)
     {
         try
         {
-            var todos = await _todoService.GetAllAsync();
+            var todos = await _todoService.GetFilteredTodosAsync(categoryId, done, sort, include);
             return Ok(todos);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error while getting all todos");
+            _logger.LogError(ex, "Error while getting filtered todos");
             return StatusCode(500, "Internal server error");
         }
     }
 
-    /// <summary>HTTP GET /api/todos/{id}</summary>
+    /// <summary>Sayfalama ile todo'ları getirir</summary>
+    [HttpGet("paged")]
+    public async Task<ActionResult<PagedResult<TodoDto>>> GetPaged(
+        [FromQuery] int pageNumber = 1, 
+        [FromQuery] int pageSize = 10,
+        [FromQuery] bool include = false)
+    {
+        try
+        {
+            var parameters = new PaginationParameters { PageNumber = pageNumber, PageSize = pageSize };
+            var result = await _todoService.GetPagedTodosAsync(parameters, include);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error while getting paged todos");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>ID'ye göre todo getirir</summary>
     [HttpGet("{id:int}")]
     public async Task<ActionResult<TodoDto>> GetById(int id)
     {
@@ -50,7 +78,7 @@ public class TodosController : ControllerBase
         }
     }
 
-    /// <summary>HTTP GET /api/todos/by-category/{categoryId}</summary>
+    /// <summary>Kategoriye göre todo'ları getirir</summary>
     [HttpGet("by-category/{categoryId:int}")]
     public async Task<ActionResult<IEnumerable<TodoDto>>> GetByCategory(int categoryId)
     {
@@ -66,13 +94,12 @@ public class TodosController : ControllerBase
         }
     }
 
-    /// <summary>HTTP GET /api/todos/completed</summary>
+    /// <summary>Tamamlanan todo'ları getirir</summary>
     [HttpGet("completed")]
     public async Task<ActionResult<IEnumerable<TodoDto>>> GetCompleted()
     {
         try
         {
-            // Interface'teki GetAllAsync ile getir, Controller'da filtrele
             var todos = await _todoService.GetAllAsync();
             return Ok(todos.Where(t => t.IsCompleted));
         }
@@ -83,7 +110,7 @@ public class TodosController : ControllerBase
         }
     }
 
-    /// <summary>HTTP GET /api/todos/pending</summary>
+    /// <summary>Bekleyen todo'ları getirir</summary>
     [HttpGet("pending")]
     public async Task<ActionResult<IEnumerable<TodoDto>>> GetPending()
     {
@@ -99,7 +126,7 @@ public class TodosController : ControllerBase
         }
     }
 
-    /// <summary>HTTP GET /api/todos/priority/{priority}</summary>
+    /// <summary>Önceliğe göre todo'ları getirir</summary>
     [HttpGet("priority/{priority:int}")]
     public async Task<ActionResult<IEnumerable<TodoDto>>> GetByPriority(int priority)
     {
@@ -116,7 +143,7 @@ public class TodosController : ControllerBase
         }
     }
 
-    /// <summary>HTTP GET /api/todos/overdue</summary>
+    /// <summary>Süresi geçmiş todo'ları getirir</summary>
     [HttpGet("overdue")]
     public async Task<ActionResult<IEnumerable<TodoDto>>> GetOverdue()
     {
@@ -133,7 +160,7 @@ public class TodosController : ControllerBase
         }
     }
 
-    /// <summary>HTTP POST /api/todos</summary>
+    /// <summary>Yeni todo oluşturur</summary>
     [HttpPost]
     public async Task<ActionResult<TodoDto>> Create(CreateTodoDto dto)
     {
@@ -150,7 +177,7 @@ public class TodosController : ControllerBase
         }
     }
 
-    /// <summary>HTTP PUT /api/todos/{id}</summary>
+    /// <summary>Todo günceller</summary>
     [HttpPut("{id:int}")]
     public async Task<ActionResult<TodoDto>> Update(int id, UpdateTodoDto dto)
     {
@@ -168,7 +195,7 @@ public class TodosController : ControllerBase
         }
     }
 
-    /// <summary>HTTP PATCH /api/todos/{id}/complete</summary>
+    /// <summary>Todo'yu tamamlandı işaretle</summary>
     [HttpPatch("{id:int}/complete")]
     public async Task<ActionResult<TodoDto>> MarkAsCompleted(int id)
     {
@@ -197,7 +224,7 @@ public class TodosController : ControllerBase
         }
     }
 
-    /// <summary>HTTP PATCH /api/todos/{id}/pending</summary>
+    /// <summary>Todo'yu bekleyen işaretle</summary>
     [HttpPatch("{id:int}/pending")]
     public async Task<ActionResult<TodoDto>> MarkAsPending(int id)
     {
@@ -226,7 +253,7 @@ public class TodosController : ControllerBase
         }
     }
 
-    /// <summary>HTTP DELETE /api/todos/{id}</summary>
+    /// <summary>Todo siler</summary>
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {

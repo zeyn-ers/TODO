@@ -97,4 +97,29 @@ public class TodoRepository : BaseRepository<Todo>, ITodoRepository
     {
         return await _dbSet.Include(t => t.Category).Where(t => t.CategoryId == categoryId).ToListAsync();
     }
+
+    /// <summary>
+    /// Tüm todo'ları ilişkilerle birlikte getirir
+    /// </summary>
+    /// <returns>Todo listesi (Category ve Notes ile)</returns>
+    public async Task<IEnumerable<Todo>> GetAllWithIncludesAsync()
+    {
+        return await _dbSet
+            .Include(t => t.Category)
+            .Include(t => t.Notes)
+            .ToListAsync();
+    }
+
+    /// <summary>
+    /// ID'ye göre todo'yu ilişkilerle birlikte getirir
+    /// </summary>
+    /// <param name="id">Todo ID'si</param>
+    /// <returns>Todo (Category ve Notes ile)</returns>
+    public async Task<Todo?> GetByIdWithIncludesAsync(int id)
+    {
+        return await _dbSet
+            .Include(t => t.Category)
+            .Include(t => t.Notes)
+            .FirstOrDefaultAsync(t => t.Id == id);
+    }
 }

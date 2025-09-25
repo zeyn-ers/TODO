@@ -152,6 +152,50 @@ namespace TodoApp.Infrastructure.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TodoApp.Domain.Entities.TodoNote", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<int>("TodoId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TodoId");
+
+                    b.ToTable("TodoNotes", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Content = "Bu ilk todo için bir not",
+                            CreatedAt = new DateTime(2025, 9, 22, 0, 0, 0, 0, DateTimeKind.Utc),
+                            TodoId = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Content = "İkinci not örneği",
+                            CreatedAt = new DateTime(2025, 9, 22, 1, 0, 0, 0, DateTimeKind.Utc),
+                            TodoId = 1
+                        });
+                });
+
             modelBuilder.Entity("TodoApp.Domain.Entities.Todo", b =>
                 {
                     b.HasOne("TodoApp.Domain.Entities.Category", "Category")
@@ -163,9 +207,25 @@ namespace TodoApp.Infrastructure.Data.Migrations
                     b.Navigation("Category");
                 });
 
+            modelBuilder.Entity("TodoApp.Domain.Entities.TodoNote", b =>
+                {
+                    b.HasOne("TodoApp.Domain.Entities.Todo", "Todo")
+                        .WithMany("Notes")
+                        .HasForeignKey("TodoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Todo");
+                });
+
             modelBuilder.Entity("TodoApp.Domain.Entities.Category", b =>
                 {
                     b.Navigation("Todos");
+                });
+
+            modelBuilder.Entity("TodoApp.Domain.Entities.Todo", b =>
+                {
+                    b.Navigation("Notes");
                 });
 #pragma warning restore 612, 618
         }

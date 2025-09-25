@@ -1,27 +1,32 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TodoApp.Domain.Entities;
 
 /// <summary>
-/// Category entity'si - Todo'ların ait olduğu kategorileri temsil eder
+/// Kategori entity'si - Todo'ları gruplamak için kullanılır
 /// </summary>
 public class Category
 {
     /// <summary>
-    /// Kategorinin benzersiz kimliği (Primary Key)
+    /// Kategori ID'si
     /// </summary>
     public int Id { get; set; }
 
     /// <summary>
-    /// Kategorinin adı (max 100 karakter)
+    /// Kategori adı (maksimum 100 karakter)
     /// </summary>
+    [Required]
+    [MaxLength(100)]
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Kategorinin açıklaması (max 500 karakter)
+    /// Kategori açıklaması (maksimum 500 karakter)
     /// </summary>
+    [MaxLength(500)]
     public string? Description { get; set; }
 
     /// <summary>
-    /// Kategorinin oluşturulma tarihi
+    /// Oluşturulma tarihi
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -31,7 +36,7 @@ public class Category
     public bool IsActive { get; set; } = true;
 
     /// <summary>
-    /// Bu kategoriye bağlı todo'lar
+    /// Bu kategoriye ait todo'lar
     /// </summary>
-    public ICollection<Todo> Todos { get; set; } = new List<Todo>();
+    public virtual ICollection<Todo> Todos { get; set; } = new List<Todo>();
 }

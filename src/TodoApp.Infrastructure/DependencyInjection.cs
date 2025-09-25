@@ -30,7 +30,8 @@ public static class DependencyInjection
         // Repository'leri kaydet
         // Scoped lifetime: Her HTTP request için yeni instance oluşturur
         services.AddScoped<ITodoRepository, TodoRepository>();
-        services.AddScoped<ICategoryRepository, CategoryRepository>(); // ✅ eklendi
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<ITodoNoteRepository, TodoNoteRepository>();
 
         return services;
     }

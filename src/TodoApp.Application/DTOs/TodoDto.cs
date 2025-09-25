@@ -19,6 +19,9 @@ namespace TodoApp.Application.DTOs
 
         /// <summary>Bağlı kategori adı (Include ile doldurulmalı)</summary>
         public string? CategoryName { get; set; }
+
+        /// <summary>Todo'ya bağlı notlar (Include ile doldurulmalı)</summary>
+        public List<TodoNoteDto> Notes { get; set; } = new();
     }
 
     /// <summary>Yeni todo oluşturma DTO'su</summary>
@@ -31,6 +34,9 @@ namespace TodoApp.Application.DTOs
 
         /// <summary>Opsiyonel kategori Id (null ise backend default set edebilir)</summary>
         public int? CategoryId { get; set; }
+
+        /// <summary>Todo oluştururken ilk not (opsiyonel)</summary>
+        public string? InitialNote { get; set; }
     }
 
     /// <summary>Todo güncelleme DTO'su (PUT)</summary>

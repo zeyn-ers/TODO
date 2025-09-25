@@ -1,133 +1,106 @@
-// Program.cs
-using FluentValidation;
-using FluentValidation.AspNetCore;
-using Microsoft.AspNetCore.Antiforgery;
-using Microsoft.EntityFrameworkCore;
-using TodoApp.Application;
-using TodoApp.Application.Mapping;
+using System.Text.Json.Serialization;
+using Serilog;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
+using Microsoft.AspNetCore.Mvc.Versioning;
 using TodoApp.Infrastructure;
-using TodoApp.Infrastructure.Data;
+using TodoApp.Application;
+
+// Serilog konfigürasyonu
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .WriteTo.File("logs/todoapp-.txt", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog();
 
-// Controllers + FluentValidation + Anti-forgery
-builder.Services.AddControllers();
-builder.Services
-    .AddFluentValidationAutoValidation()
-    .AddFluentValidationClientsideAdapters();
+// Infrastructure ve Application katmanlarını kaydet
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddApplication();
 
-// Anti-forgery tokens for CSRF protection
-builder.Services.AddAntiforgery(options =>
+// AutoMapper
+builder.Services.AddAutoMapper(typeof(TodoApp.Application.Mappings.MappingProfile));
+
+// API Versioning
+builder.Services.AddApiVersioning(opt =>
 {
-    options.HeaderName = "X-XSRF-TOKEN";
-    options.SuppressXFrameOptionsHeader = false;
+    opt.DefaultApiVersion = new ApiVersion(1, 0);
+    opt.AssumeDefaultVersionWhenUnspecified = true;
+    opt.ApiVersionReader = ApiVersionReader.Combine(
+        new UrlSegmentApiVersionReader(),
+        new QueryStringApiVersionReader("version"),
+        new HeaderApiVersionReader("X-Version")
+    );
 });
 
-// Validatorları tara
-builder.Services.AddValidatorsFromAssemblyContaining<TodoApp.Application.Validators.CreateTodoDtoValidator>();
+builder.Services.AddVersionedApiExplorer(setup =>
+{
+    setup.GroupNameFormat = "'v'VVV";
+    setup.SubstituteApiVersionInUrl = true;
+});
+
+// Controllers (+ JSON güvenli ayar)
+builder.Services
+    .AddControllers()
+    .AddJsonOptions(o =>
+    {
+        o.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+        o.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    });
 
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new() { Title = "TodoApp API", Version = "v1" });
+    c.SwaggerDoc("v2", new() { Title = "TodoApp API", Version = "v2" });
+});
 
-// App & Infra
-builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
-
-// AutoMapper
-builder.Services.AddAutoMapper(typeof(MappingProfile).Assembly);
-
-// CORS (frontend)
+// CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFrontend", p => p
-        .WithOrigins("http://localhost:4200", "https://localhost:4200")
-        .AllowAnyMethod()
-        .AllowAnyHeader()
-        .AllowCredentials());
+    options.AddPolicy("AllowAll", p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
 
 var app = builder.Build();
 
-//
-// 🔧 DB şemasını otomatik güncelle (veriyi SİLMEZ) + log
-//
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<TodoDbContext>();
-    db.Database.Migrate();
-    var cs = db.Database.GetDbConnection().ConnectionString;
-    app.Logger.LogInformation("✅ Connected DB: {ConnectionString}", cs);
-}
-
 if (app.Environment.IsDevelopment())
 {
+    var apiVersionDescriptionProvider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+    
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "TodoApp API V1");
         c.RoutePrefix = string.Empty;
+        foreach (var description in apiVersionDescriptionProvider.ApiVersionDescriptions)
+        {
+            c.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", 
+                $"TodoApp API {description.GroupName.ToUpperInvariant()}");
+        }
     });
 }
 
+// Serilog HTTP request logging
+app.UseSerilogRequestLogging();
+
 app.UseHttpsRedirection();
 
-// ⚙️ Güvenlik + içerik türü + cache header düzeltmeleri
-app.Use(async (ctx, next) =>
-{
-    // Devam etsin, sonra header’ları set edelim
-    await next();
-
-    var h = ctx.Response.Headers;
-
-    // --- Security headers ---
-    h.TryAdd("X-Content-Type-Options", "nosniff");                 // Issues: x-content-type-options
-    h.TryAdd("Referrer-Policy", "no-referrer");
-    h.TryAdd("X-Frame-Options", "DENY");                           // Not: CSP ile güçlendirilir
-    h.TryAdd("Content-Security-Policy", "frame-ancestors 'none'"); // iframe engeli
-
-    // --- JSON charset fix (CORB/charset uyarıları için) ---
-    if (!string.IsNullOrEmpty(ctx.Response.ContentType) &&
-        ctx.Response.ContentType.StartsWith("application/json", StringComparison.OrdinalIgnoreCase) &&
-        !ctx.Response.ContentType.Contains("charset", StringComparison.OrdinalIgnoreCase))
-    {
-        ctx.Response.ContentType = "application/json; charset=utf-8";
-    }
-
-    // --- Pragma/Expires kaldır, Cache-Control tercih et ---
-    h.Remove("Pragma");
-    h.Remove("Expires");
-
-    // API cevapları için güvenli cache politikası
-    if (ctx.Request.Path.StartsWithSegments("/api"))
-    {
-        h["Cache-Control"] = "no-cache, no-store, must-revalidate";
-    }
-});
-
-// (Statik dosya servis ediyorsan) Cache-Control’u modernleştir
-app.UseStaticFiles(new StaticFileOptions
-{
-    OnPrepareResponse = ctx =>
-    {
-        var h = ctx.Context.Response.Headers;
-        // Build çıktıları için uzun cache (gerekirse düşür)
-        h["Cache-Control"] = "public, max-age=604800, immutable";
-        h.Remove("Pragma");
-        h.Remove("Expires");
-    }
-});
-
-app.UseCors("AllowFrontend");
+app.UseCors("AllowAll");
 app.UseAuthorization();
-
-// Anti-forgery token endpoint
-app.MapGet("/api/antiforgery/token", (IAntiforgery forgery, HttpContext context) =>
-{
-    var tokens = forgery.GetAndStoreTokens(context);
-    return Results.Ok(new { token = tokens.RequestToken });
-});
 
 app.MapControllers();
 
-app.Run();
+try
+{
+    Log.Information("Starting TodoApp API");
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

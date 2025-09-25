@@ -12,23 +12,25 @@ namespace TodoApp.Application.Services;
 public class TodoService : ITodoService
 {
     private readonly ITodoRepository _todoRepository;
+    private readonly ITodoNoteRepository _todoNoteRepository;
     private readonly IMapper _mapper;
 
-    public TodoService(ITodoRepository todoRepository, IMapper mapper)
+    public TodoService(ITodoRepository todoRepository, ITodoNoteRepository todoNoteRepository, IMapper mapper)
     {
         _todoRepository = todoRepository;
+        _todoNoteRepository = todoNoteRepository;
         _mapper = mapper;
     }
 
     /// <summary>Tüm todo'ları getirir</summary>
-    public async Task<IEnumerable<TodoDto>> GetAllAsync()
+    public async Task<IEnumerable<TodoDto>> GetAllAsync(bool includeRelations = false)
     {
         var todos = await _todoRepository.GetAllAsync();
         return _mapper.Map<IEnumerable<TodoDto>>(todos);
     }
 
     /// <summary>ID'ye göre tek todo getirir</summary>
-    public async Task<TodoDto?> GetByIdAsync(int id)
+    public async Task<TodoDto?> GetByIdAsync(int id, bool includeRelations = false)
     {
         var todo = await _todoRepository.GetByIdAsync(id);
         return todo != null ? _mapper.Map<TodoDto>(todo) : null;
@@ -50,6 +52,19 @@ public class TodoService : ITodoService
         };
 
         var created = await _todoRepository.AddAsync(entity);
+        
+        // InitialNote varsa ekle
+        if (!string.IsNullOrWhiteSpace(dto.InitialNote))
+        {
+            var note = new TodoNote
+            {
+                TodoId = created.Id,
+                Content = dto.InitialNote,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _todoNoteRepository.AddAsync(note);
+        }
+        
         return _mapper.Map<TodoDto>(created);
     }
 
@@ -86,5 +101,61 @@ public class TodoService : ITodoService
     {
         var todos = await _todoRepository.GetTodosByCategoryAsync(categoryId);
         return _mapper.Map<IEnumerable<TodoDto>>(todos);
+    }
+
+    /// <summary>Sayfalama ile todo'ları getirir</summary>
+    public async Task<PagedResult<TodoDto>> GetPagedTodosAsync(PaginationParameters parameters)
+    {
+        var (items, totalCount) = await _todoRepository.GetPagedAsync(parameters.PageNumber, parameters.PageSize);
+        var todoDtos = _mapper.Map<IEnumerable<TodoDto>>(items);
+        
+        return new PagedResult<TodoDto>
+        {
+            Data = todoDtos,
+            TotalCount = totalCount,
+            PageNumber = parameters.PageNumber,
+            PageSize = parameters.PageSize
+        };
+    }
+
+    public async Task<IEnumerable<TodoDto>> GetTodosByCategoryAsync(int categoryId, bool includeRelations = false)
+    {
+        var todos = await _todoRepository.GetTodosByCategoryAsync(categoryId);
+        return _mapper.Map<IEnumerable<TodoDto>>(todos);
+    }
+
+    public async Task<PagedResult<TodoDto>> GetPagedTodosAsync(PaginationParameters parameters, bool includeRelations = false)
+    {
+        var (items, totalCount) = await _todoRepository.GetPagedAsync(parameters.PageNumber, parameters.PageSize);
+        var todoDtos = _mapper.Map<IEnumerable<TodoDto>>(items);
+        
+        return new PagedResult<TodoDto>
+        {
+            Data = todoDtos,
+            TotalCount = totalCount,
+            PageNumber = parameters.PageNumber,
+            PageSize = parameters.PageSize
+        };
+    }
+
+    public async Task<IEnumerable<TodoDto>> GetFilteredTodosAsync(int? categoryId = null, bool? isDone = null, string? sortBy = null, bool includeRelations = false)
+    {
+        var todos = await _todoRepository.GetAllAsync();
+        var query = todos.AsQueryable();
+        
+        if (categoryId.HasValue)
+            query = query.Where(t => t.CategoryId == categoryId.Value);
+            
+        if (isDone.HasValue)
+            query = query.Where(t => t.IsCompleted == isDone.Value);
+            
+        query = sortBy?.ToLower() switch
+        {
+            "priority" => query.OrderByDescending(t => t.Priority),
+            "duedate" => query.OrderBy(t => t.DueDate ?? DateTime.MaxValue),
+            _ => query.OrderByDescending(t => t.CreatedAt)
+        };
+        
+        return _mapper.Map<IEnumerable<TodoDto>>(query.ToList());
     }
 }

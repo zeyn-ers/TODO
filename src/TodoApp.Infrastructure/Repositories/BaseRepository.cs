@@ -112,4 +112,21 @@ public class BaseRepository<T> : IRepository<T> where T : class
     {
         return await _dbSet.FindAsync(id) != null;
     }
+
+    /// <summary>
+    /// Sayfalama ile entity'leri getirir
+    /// </summary>
+    /// <param name="pageNumber">Sayfa numarası</param>
+    /// <param name="pageSize">Sayfa boyutu</param>
+    /// <returns>Sayfalanmış entity listesi ve toplam sayı</returns>
+    public virtual async Task<(IEnumerable<T> Items, int TotalCount)> GetPagedAsync(int pageNumber, int pageSize)
+    {
+        var totalCount = await _dbSet.CountAsync();
+        var items = await _dbSet
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+        
+        return (items, totalCount);
+    }
 }

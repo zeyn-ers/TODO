@@ -12,6 +12,7 @@ namespace TodoApp.Application
         {
             services.AddScoped<ICategoryService, CategoryService>();
             services.AddScoped<ITodoService, TodoService>();
+            services.AddScoped<ITodoNoteService, TodoNoteService>();
             return services;
         }
     }

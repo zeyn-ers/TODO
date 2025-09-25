@@ -1,12 +1,14 @@
 {
+  "$schema": "https://json.schemastore.org/launchsettings.json",
   "profiles": {
     "TodoApp.API": {
       "commandName": "Project",
       "launchBrowser": true,
+      "dotnetRunMessages": true,
+      "applicationUrl": "https://localhost:57683;http://localhost:57684",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
-      },
-      "applicationUrl": "https://localhost:57683;http://localhost:57684"
+      }
     }
   }
 }

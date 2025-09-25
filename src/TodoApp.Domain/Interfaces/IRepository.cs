@@ -55,4 +55,12 @@ public interface IRepository<T> where T : class
     /// <param name="id">Kontrol edilecek ID</param>
     /// <returns>Entity varsa true, yoksa false</returns>
     Task<bool> ExistsAsync(int id);
+
+    /// <summary>
+    /// Sayfalama ile entity'leri getirir
+    /// </summary>
+    /// <param name="pageNumber">Sayfa numarası</param>
+    /// <param name="pageSize">Sayfa boyutu</param>
+    /// <returns>Sayfalanmış entity listesi ve toplam sayı</returns>
+    Task<(IEnumerable<T> Items, int TotalCount)> GetPagedAsync(int pageNumber, int pageSize);
 }

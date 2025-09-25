@@ -1,17 +1,23 @@
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using TodoApp.Domain.Entities;
 
-namespace TodoApp.Domain.Interfaces
-{
-    /// Category repository interface'i
-    /// Category verileri için özel sorguları barındırır
-    public interface ICategoryRepository : IRepository<Category>
-    {
-        /// Sadece aktif kategorileri getirir
-        Task<IEnumerable<Category>> GetActiveCategoriesAsync();
+namespace TodoApp.Domain.Interfaces;
 
-        /// İsme göre tek bir kategori döner
-        Task<Category?> GetCategoryByNameAsync(string name);
-    }
+/// <summary>
+/// Category repository interface'i
+/// Repository Pattern - veri erişim katmanını soyutlar
+/// </summary>
+public interface ICategoryRepository : IRepository<Category>
+{
+    /// <summary>
+    /// Aktif kategorileri getirir
+    /// </summary>
+    /// <returns>Aktif kategoriler listesi</returns>
+    Task<IEnumerable<Category>> GetActiveCategoriesAsync();
+
+    /// <summary>
+    /// İsme göre kategori arar
+    /// </summary>
+    /// <param name="name">Kategori adı</param>
+    /// <returns>Bulunan kategori veya null</returns>
+    Task<Category?> GetCategoryByNameAsync(string name);
 }

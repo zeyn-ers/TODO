@@ -15,6 +15,7 @@ public class TodoDbContext : DbContext
     // DbSet'ler
     public DbSet<Todo> Todos { get; set; } = null!;
     public DbSet<Category> Categories { get; set; } = null!;
+    public DbSet<TodoNote> TodoNotes { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +52,22 @@ public class TodoDbContext : DbContext
             e.Property(x => x.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
         });
 
+        /* ---- TODO NOTE ---- */
+        modelBuilder.Entity<TodoNote>(e =>
+        {
+            e.ToTable("TodoNotes");
+            e.HasKey(x => x.Id);
+
+            e.Property(x => x.Content).IsRequired().HasMaxLength(1000);
+            e.Property(x => x.CreatedAt).IsRequired().HasDefaultValueSql("GETUTCDATE()");
+
+            // N:1 ilişki (TodoNote → Todo)
+            e.HasOne(x => x.Todo)
+             .WithMany(t => t.Notes)
+             .HasForeignKey(x => x.TodoId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
         /* ---- SEED ---- */
         // Category seed (sabit tarihler kullanıyoruz)
         modelBuilder.Entity<Category>().HasData(
@@ -81,6 +98,24 @@ public class TodoDbContext : DbContext
                 UpdatedAt = new DateTime(2025, 09, 22, 0, 0, 0, DateTimeKind.Utc),
                 Priority = 1,
                 CategoryId = 1
+            }
+        );
+
+        // TodoNote seed
+        modelBuilder.Entity<TodoNote>().HasData(
+            new TodoNote
+            {
+                Id = 1,
+                TodoId = 1,
+                Content = "Bu ilk todo için bir not",
+                CreatedAt = new DateTime(2025, 09, 22, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new TodoNote
+            {
+                Id = 2,
+                TodoId = 1,
+                Content = "İkinci not örneği",
+                CreatedAt = new DateTime(2025, 09, 22, 1, 0, 0, DateTimeKind.Utc)
             }
         );
     }

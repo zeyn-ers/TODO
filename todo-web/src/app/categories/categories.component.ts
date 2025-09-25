@@ -16,6 +16,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatBadgeModule } from '@angular/material/badge';
 
 import { CategoriesService, CategoryDto } from '../services/categories.service';
 import { CategoryEditDialogComponent } from './category-edit.dialog';
@@ -30,7 +31,7 @@ import { TodosService, TodoDto } from '../services/todos.service';
     MatButtonModule, MatIconModule, MatListModule,
     MatDialogModule, MatSnackBarModule, MatSelectModule,
     MatChipsModule, MatCheckboxModule, MatDividerModule,
-    MatTooltipModule, MatMenuModule
+    MatTooltipModule, MatMenuModule, MatBadgeModule
   ],
   styles: [`
     :host { display:block; background:linear-gradient(180deg,#fafafa,#f6f7fb); padding:1rem; }

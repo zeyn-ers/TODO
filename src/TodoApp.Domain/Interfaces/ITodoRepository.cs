@@ -41,4 +41,17 @@ public interface ITodoRepository : IRepository<Todo>
     /// <param name="categoryId">Kategori ID'si</param>
     /// <returns>Kategoriye ait todo listesi</returns>
     Task<IEnumerable<Todo>> GetTodosByCategoryAsync(int categoryId);
+
+    /// <summary>
+    /// Tüm todo'ları ilişkilerle birlikte getirir
+    /// </summary>
+    /// <returns>Todo listesi (Category ve Notes ile)</returns>
+    Task<IEnumerable<Todo>> GetAllWithIncludesAsync();
+
+    /// <summary>
+    /// ID'ye göre todo'yu ilişkilerle birlikte getirir
+    /// </summary>
+    /// <param name="id">Todo ID'si</param>
+    /// <returns>Todo (Category ve Notes ile)</returns>
+    Task<Todo?> GetByIdWithIncludesAsync(int id);
 }

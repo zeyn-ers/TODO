@@ -7,13 +7,19 @@ namespace TodoApp.Application.Interfaces
     /// <summary>Todo kullanım senaryoları için servis kontratı</summary>
     public interface ITodoService
     {
-        Task<IEnumerable<TodoDto>> GetAllAsync();
-        Task<TodoDto?> GetByIdAsync(int id);
+        Task<IEnumerable<TodoDto>> GetAllAsync(bool includeRelations = false);
+        Task<TodoDto?> GetByIdAsync(int id, bool includeRelations = false);
         Task<TodoDto> CreateAsync(CreateTodoDto dto);
         Task<TodoDto?> UpdateAsync(int id, UpdateTodoDto dto);
         Task<bool> DeleteAsync(int id);
 
         /// <summary>Belirli kategoriye ait todo’ları listeler</summary>
-        Task<IEnumerable<TodoDto>> GetTodosByCategoryAsync(int categoryId); // ✅ eklendi
+        Task<IEnumerable<TodoDto>> GetTodosByCategoryAsync(int categoryId, bool includeRelations = false);
+
+        /// <summary>Sayfalama ile todo'ları getirir</summary>
+        Task<PagedResult<TodoDto>> GetPagedTodosAsync(PaginationParameters parameters, bool includeRelations = false);
+
+        /// <summary>Filtreleme ve sıralama ile todo'ları getirir</summary>
+        Task<IEnumerable<TodoDto>> GetFilteredTodosAsync(int? categoryId = null, bool? isDone = null, string? sortBy = null, bool includeRelations = false);
     }
 }

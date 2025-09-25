@@ -1,31 +1,45 @@
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using TodoApp.Application.DTOs;
 
-namespace TodoApp.Application.Interfaces
+namespace TodoApp.Application.Interfaces;
+
+/// <summary>
+/// Category service interface'i
+/// Category ile ilgili iş mantığı operasyonlarını tanımlar
+/// </summary>
+public interface ICategoryService
 {
-    /// <summary>Category kullanım senaryoları için servis kontratı</summary>
-    public interface ICategoryService
-    {
-        /// <summary>Tüm kategorileri listeler</summary>
-        Task<IEnumerable<CategoryDto>> GetAllAsync();
+    /// <summary>
+    /// Tüm kategorileri getirir
+    /// </summary>
+    Task<IEnumerable<CategoryDto>> GetAllCategoriesAsync();
 
-        /// <summary>Aktif kategorileri listeler</summary>
-        Task<IEnumerable<CategoryDto>> GetActiveAsync();
+    /// <summary>
+    /// ID'ye göre kategori getirir
+    /// </summary>
+    Task<CategoryDto?> GetCategoryByIdAsync(int id);
 
-        /// <summary>Id'ye göre tek kategori</summary>
-        Task<CategoryDto?> GetByIdAsync(int id);
+    /// <summary>
+    /// Aktif kategorileri getirir
+    /// </summary>
+    Task<IEnumerable<CategoryDto>> GetActiveCategoriesAsync();
 
-        /// <summary>İsme göre tek kategori</summary>
-        Task<CategoryDto?> GetByNameAsync(string name);
+    /// <summary>
+    /// Yeni kategori oluşturur
+    /// </summary>
+    Task<CategoryDto> CreateCategoryAsync(CreateCategoryDto createDto);
 
-        /// <summary>Yeni kategori oluşturur</summary>
-        Task<CategoryDto> CreateAsync(CreateCategoryDto dto);
+    /// <summary>
+    /// Kategori günceller
+    /// </summary>
+    Task<CategoryDto?> UpdateCategoryAsync(int id, UpdateCategoryDto updateDto);
 
-        /// <summary>Kategoriyi günceller</summary>
-        Task<CategoryDto?> UpdateAsync(int id, UpdateCategoryDto dto);
+    /// <summary>
+    /// Kategori siler
+    /// </summary>
+    Task<bool> DeleteCategoryAsync(int id);
 
-        /// <summary>Kategoriyi siler</summary>
-        Task<bool> DeleteAsync(int id);
-    }
+    /// <summary>
+    /// Sayfalama ile kategorileri getirir
+    /// </summary>
+    Task<PagedResult<CategoryDto>> GetPagedCategoriesAsync(PaginationParameters parameters);
 }

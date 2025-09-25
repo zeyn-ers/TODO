@@ -26,4 +26,9 @@ public class Todo
     /// Todo'nun kategorisi (Navigation property)
     /// </summary>
     public Category? Category { get; set; }
+
+    /// <summary>
+    /// Todo'ya bağlı notlar (Navigation property)
+    /// </summary>
+    public ICollection<TodoNote> Notes { get; set; } = new List<TodoNote>();
 }
