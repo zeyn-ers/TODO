@@ -4,88 +4,70 @@ using TodoApp.Application.Interfaces;
 
 namespace TodoApp.API.Controllers.V2;
 
-/// <summary>
-/// TodoNotes Controller V2 - Todo notları yönetimi
-/// </summary>
 [ApiController]
 [ApiVersion("2.0")]
-[Route("api/v{version:apiVersion}/todos/{todoId:int}/notes")]
-public class TodoNotesController : ControllerBase
+[Route("api/v{version:apiVersion}/todos/{todoId:int}/[controller]")]
+[Produces("application/json")]
+public class TodoNotesV2Controller : ControllerBase
 {
-    private readonly ITodoNoteService _todoNoteService;
-    private readonly ILogger<TodoNotesController> _logger;
+    private readonly ITodoNoteService _service;
+    private readonly ILogger<TodoNotesV2Controller> _logger;
 
-    public TodoNotesController(ITodoNoteService todoNoteService, ILogger<TodoNotesController> logger)
+    public TodoNotesV2Controller(ITodoNoteService service, ILogger<TodoNotesV2Controller> logger)
     {
-        _todoNoteService = todoNoteService;
+        _service = service;
         _logger = logger;
     }
 
-    /// <summary>Todo'ya ait notları getirir</summary>
+    // GET: api/v2/todos/5/todonotes
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<TodoNoteDto>>> GetNotes(int todoId)
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<TodoNoteDto>>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<IEnumerable<TodoNoteDto>>>> GetAll(int todoId)
     {
-        try
-        {
-            var notes = await _todoNoteService.GetByTodoIdAsync(todoId);
-            return Ok(notes);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error while getting notes for todo {TodoId}", todoId);
-            return StatusCode(500, "Internal server error");
-        }
+        var list = await _service.GetByTodoIdAsync(todoId);
+        return Ok(new ApiResponse<IEnumerable<TodoNoteDto>>(list));
     }
 
-    /// <summary>Todo'ya yeni not ekler</summary>
+    // GET: api/v2/todos/5/todonotes/12
+    [HttpGet("{id:int}")]
+    [ProducesResponseType(typeof(ApiResponse<TodoNoteDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<TodoNoteDto>>> GetById(int todoId, int id)
+    {
+        // GetByIdAsync method yok, sadece GetByTodoIdAsync var
+        var allNotes = await _service.GetByTodoIdAsync(todoId);
+        var item = allNotes.FirstOrDefault(n => n.Id == id);
+        if (item is null) return NotFound(new ProblemDetails { Title = "Not found", Status = 404 });
+        return Ok(new ApiResponse<TodoNoteDto>(item));
+    }
+
+    // POST: api/v2/todos/5/todonotes
     [HttpPost]
-    public async Task<ActionResult<TodoNoteDto>> CreateNote(int todoId, CreateTodoNoteDto dto)
+    [ProducesResponseType(typeof(ApiResponse<TodoNoteDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ApiResponse<TodoNoteDto>>> Create(int todoId, [FromBody] CreateTodoNoteDto dto)
     {
-        try
-        {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-            var note = await _todoNoteService.CreateAsync(todoId, dto);
-            return CreatedAtAction(nameof(GetNotes), new { todoId }, note);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error while creating note for todo {TodoId}", todoId);
-            return StatusCode(500, "Internal server error");
-        }
+        var created = await _service.CreateAsync(todoId, dto);
+        return CreatedAtAction(nameof(GetById), new { todoId, id = created.Id, version = "2.0" }, new ApiResponse<TodoNoteDto>(created));
     }
 
-    /// <summary>Todo notunu günceller</summary>
-    [HttpPut("{noteId:int}")]
-    public async Task<ActionResult<TodoNoteDto>> UpdateNote(int todoId, int noteId, UpdateTodoNoteDto dto)
+    // PUT: api/v2/todos/5/todonotes/12
+    [HttpPut("{id:int}")]
+    [ProducesResponseType(typeof(ApiResponse<TodoNoteDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<TodoNoteDto>>> Update(int todoId, int id, [FromBody] UpdateTodoNoteDto dto)
     {
-        try
-        {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
-            var updated = await _todoNoteService.UpdateAsync(todoId, noteId, dto);
-            if (updated == null) return NotFound($"Note with ID {noteId} not found for todo {todoId}");
-            return Ok(updated);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error while updating note {NoteId} for todo {TodoId}", noteId, todoId);
-            return StatusCode(500, "Internal server error");
-        }
+        var updated = await _service.UpdateAsync(todoId, id, dto);
+        if (updated is null) return NotFound(new ProblemDetails { Title = "Not found", Status = 404 });
+        return Ok(new ApiResponse<TodoNoteDto>(updated, "Updated"));
     }
 
-    /// <summary>Todo notunu siler</summary>
-    [HttpDelete("{noteId:int}")]
-    public async Task<IActionResult> DeleteNote(int todoId, int noteId)
+    // DELETE: api/v2/todos/5/todonotes/12
+    [HttpDelete("{id:int}")]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<bool>>> Delete(int todoId, int id)
     {
-        try
-        {
-            var deleted = await _todoNoteService.DeleteAsync(todoId, noteId);
-            if (!deleted) return NotFound($"Note with ID {noteId} not found for todo {todoId}");
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error while deleting note {NoteId} for todo {TodoId}", noteId, todoId);
-            return StatusCode(500, "Internal server error");
-        }
+        var ok = await _service.DeleteAsync(todoId, id);
+        return Ok(new ApiResponse<bool>(ok, ok ? "Deleted" : "No change"));
     }
 }

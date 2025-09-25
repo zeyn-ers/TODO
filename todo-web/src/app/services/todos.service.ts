@@ -1,9 +1,6 @@
-import { Injectable, inject, signal, ChangeDetectorRef, ApplicationRef } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { EMPTY, of } from 'rxjs';
-import { catchError, tap } from 'rxjs/operators';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { environment } from '../../environments/environment';
+import { BehaviorSubject, Observable, catchError, of, tap, map } from 'rxjs';
 
 export interface TodoDto {
   id: number;
@@ -13,222 +10,126 @@ export interface TodoDto {
   createdAt: string;
   updatedAt?: string | null;
   dueDate?: string | null;
-  priority: number;
-  categoryId: number | null;
+  priority: number;          // 1..3
+  categoryId?: number | null;
   categoryName?: string | null;
-  notes: TodoNoteDto[];
 }
 
 export interface CreateTodoDto {
   title: string;
-  description: string;
+  description?: string;
   dueDate?: string | null;
-  priority: number;
+  priority: number;          // zorunlu
   categoryId?: number | null;
-  initialNote?: string;
 }
 
-export interface UpdateTodoDto {
-  title: string;
-  description: string;
+export interface UpdateTodoDto extends CreateTodoDto {
   isCompleted: boolean;
-  dueDate?: string | null;
-  priority: number;
-  categoryId?: number | null;
-}
-
-export interface TodoNoteDto {
-  id: number;
-  todoId: number;
-  content: string;
-  createdAt: string;
-}
-
-export interface CreateTodoNoteDto {
-  content: string;
-}
-
-export interface PagedResult<T> {
-  items: T[];
-  totalCount: number;
-  pageNumber: number;
-  pageSize: number;
-  totalPages: number;
 }
 
 @Injectable({ providedIn: 'root' })
 export class TodosService {
   private http = inject(HttpClient);
-  private snack = inject(MatSnackBar);
-  private appRef = inject(ApplicationRef);
+  private base = '/api/v2/todos';
 
-  readonly todos = signal<TodoDto[]>([]);
-  readonly pagedTodos = signal<PagedResult<TodoDto> | null>(null);
-  readonly selectedTodo = signal<TodoDto | null>(null);
+  private _todos = new BehaviorSubject<TodoDto[]>([]);
+  readonly todos$ = this._todos.asObservable();
 
-  private tick() {
-    this.appRef.tick();
+  get todos(): TodoDto[] {
+    return this._todos.value;
   }
 
-  loadAll() {
-    this.http.get<TodoDto[]>(`${environment.apiBase}/todos`).pipe(
-      tap(list => {
-        const todos = (list ?? []).map(t => ({ ...t, notes: t.notes || [] }));
-        this.todos.set(todos);
-        this.tick();
-      }),
+  load(includeRelations = true): Observable<TodoDto[]> {
+    const url = `${this.base}?include=${includeRelations}`;
+    return this.http.get<{ data: TodoDto[] }>(url).pipe(
+      map(res => res.data),
+      tap(data => this._todos.next(data)),
       catchError(err => {
-        this.snack.open(this.msg(err, 'Todo listesi alınamadı'), 'Kapat', { duration: 1600 });
+        console.error('todos load error', err);
+        this._todos.next([]);
         return of([]);
       })
-    ).subscribe();
+    );
   }
 
-  loadPaged(pageNumber: number = 1, pageSize: number = 10) {
-    // Backend'de pagination yok, normal listeyi kullan
-    this.loadAll();
-  }
-
-  loadByCategory(categoryId: number) {
-    // Backend'de category filter yok, client-side filter kullan
-    this.loadAll();
-  }
-
-  loadCompleted() {
-    // Backend'de completed filter yok, client-side filter kullan
-    this.loadAll();
-  }
-
-  loadPending() {
-    // Backend'de pending filter yok, client-side filter kullan
-    this.loadAll();
-  }
-
-  add(dto: CreateTodoDto) {
-    this.http.post<TodoDto>(`${environment.apiBase}/todos`, dto).pipe(
-      tap(created => {
-        this.todos.set([created, ...this.todos()]);
-        this.snack.open('Todo eklendi', 'Kapat', { duration: 1200 });
-        this.tick();
-      }),
-      catchError(err => {
-        this.snack.open(this.msg(err, 'Todo eklenemedi'), 'Kapat', { duration: 1800 });
-        return EMPTY;
-      })
-    ).subscribe();
-  }
-
-  update(id: number, dto: UpdateTodoDto) {
-    const prev = this.todos();
-    const patched = prev.map(t => t.id === id ? { ...t, ...dto } : t);
-    this.todos.set(patched);
-    this.tick();
-
-    this.http.put<TodoDto>(`${environment.apiBase}/todos/${id}`, dto).pipe(
-      tap(updated => {
-        const list = this.todos().map(t => t.id === id ? updated : t);
-        this.todos.set(list);
-        this.snack.open('Todo güncellendi', 'Kapat', { duration: 1200 });
-        this.tick();
-      }),
-      catchError(err => {
-        this.todos.set(prev);
-        this.snack.open(this.msg(err, 'Todo güncellenemedi'), 'Kapat', { duration: 1800 });
-        this.tick();
-        return EMPTY;
-      })
-    ).subscribe();
-  }
-
-  toggle(id: number) {
-    const todo = this.todos().find(t => t.id === id);
-    if (!todo) return;
-
-    const dto: UpdateTodoDto = {
-      title: todo.title,
-      description: todo.description,
-      isCompleted: !todo.isCompleted,
-      dueDate: todo.dueDate,
-      priority: todo.priority,
-      categoryId: todo.categoryId ?? null
+  add(payload: { title: string; description?: string; categoryId?: number; dueDate?: string }): Observable<TodoDto | null> {
+    // priority zorunlu -> varsayılan 1
+    const body: CreateTodoDto = {
+      title: payload.title,
+      description: payload.description ?? '',
+      categoryId: payload.categoryId,
+      dueDate: payload.dueDate ?? null,
+      priority: 1,
     };
-
-    this.update(id, dto);
+    return this.http.post<{ data: TodoDto }>(this.base, body).pipe(
+      map(res => res.data),
+      tap(todo => this._todos.next([todo, ...this.todos])),
+      catchError(err => {
+        console.error('todo add error', err);
+        return of(null);
+      })
+    );
   }
 
-  remove(id: number) {
-    const prev = this.todos();
-    const after = prev.filter(t => t.id !== id);
-    this.todos.set(after);
-    this.tick();
+  toggle(id: number): Observable<TodoDto | null> {
+    const t = this.todos.find(x => x.id === id);
+    if (!t) return of(null);
+    const body: UpdateTodoDto = {
+      title: t.title,
+      description: t.description,
+      categoryId: t.categoryId ?? undefined,
+      dueDate: t.dueDate ?? null,
+      priority: t.priority ?? 1,
+      isCompleted: !t.isCompleted,
+    };
+    return this.http.put<{ data: TodoDto }>(`${this.base}/${id}`, body).pipe(
+      map(res => res.data),
+      tap(todo => {
+        const list: TodoDto[] = this.todos.map(x => (x.id === id ? todo : x));
+        this._todos.next(list);
+      }),
+      catchError(err => {
+        console.error('todo toggle error', err);
+        return of(null);
+      })
+    );
+  }
 
-    this.http.delete<void>(`${environment.apiBase}/todos/${id}`).pipe(
+  update(id: number, patch: Partial<UpdateTodoDto>): Observable<TodoDto | null> {
+    const t = this.todos.find(x => x.id === id);
+    if (!t) return of(null);
+    const body: UpdateTodoDto = {
+      title: patch.title ?? t.title,
+      description: patch.description ?? t.description,
+      categoryId: patch.categoryId ?? t.categoryId ?? undefined,
+      dueDate: patch.dueDate ?? t.dueDate ?? null,
+      priority: patch.priority ?? t.priority ?? 1,
+      isCompleted: patch.isCompleted ?? t.isCompleted,
+    };
+    return this.http.put<{ data: TodoDto }>(`${this.base}/${id}`, body).pipe(
+      map(res => res.data),
+      tap(todo => {
+        const list: TodoDto[] = this.todos.map(x => (x.id === id ? todo : x));
+        this._todos.next(list);
+      }),
+      catchError(err => {
+        console.error('todo update error', err);
+        return of(null);
+      })
+    );
+  }
+
+  remove(id: number): Observable<boolean> {
+    return this.http.delete<{ data: boolean }>(`${this.base}/${id}`).pipe(
+      map(res => res.data),
       tap(() => {
-        this.snack.open('Todo silindi', 'Kapat', { duration: 1200 });
-        this.tick();
+        const list: TodoDto[] = this.todos.filter(x => x.id !== id);
+        this._todos.next(list);
       }),
       catchError(err => {
-        this.todos.set(prev);
-        this.snack.open(this.msg(err, 'Todo silinemedi'), 'Kapat', { duration: 1800 });
-        this.tick();
-        return EMPTY;
+        console.error('todo delete error', err);
+        return of(false);
       })
-    ).subscribe();
-  }
-
-  clearCompleted() {
-    const completed = this.todos().filter(t => t.isCompleted);
-    completed.forEach(todo => this.remove(todo.id));
-  }
-
-  selectTodo(todo: TodoDto | null) {
-    this.selectedTodo.set(todo);
-    this.tick();
-  }
-
-  loadFiltered(categoryId?: number, done?: boolean, sort?: string, include = true) {
-    // Backend'de filter parametreleri yok, normal listeyi kullan
-    this.loadAll();
-  }
-
-  addNote(todoId: number, content: string) {
-    this.http.post<TodoNoteDto>(`/api/todos/${todoId}/notes`, { content }).pipe(
-      tap(note => {
-        const selected = this.selectedTodo();
-        if (selected && selected.id === todoId) {
-          selected.notes.push(note);
-          this.selectedTodo.set({ ...selected });
-        }
-        this.snack.open('Not eklendi', 'Kapat', { duration: 1200 });
-        this.tick();
-      }),
-      catchError(err => {
-        this.snack.open(this.msg(err, 'Not eklenemedi'), 'Kapat', { duration: 1800 });
-        return EMPTY;
-      })
-    ).subscribe();
-  }
-
-  removeNote(todoId: number, noteId: number) {
-    this.http.delete<void>(`/api/todos/${todoId}/notes/${noteId}`).pipe(
-      tap(() => {
-        const selected = this.selectedTodo();
-        if (selected && selected.id === todoId) {
-          selected.notes = selected.notes.filter(n => n.id !== noteId);
-          this.selectedTodo.set({ ...selected });
-        }
-        this.snack.open('Not silindi', 'Kapat', { duration: 1200 });
-        this.tick();
-      }),
-      catchError(err => {
-        this.snack.open(this.msg(err, 'Not silinemedi'), 'Kapat', { duration: 1800 });
-        return EMPTY;
-      })
-    ).subscribe();
-  }
-
-  private msg(err: any, fallback: string) {
-    const server = err?.error?.message || err?.error?.title || err?.message;
-    return server ? `${fallback}: ${server}` : fallback;
+    );
   }
 }

@@ -4,171 +4,69 @@ using TodoApp.Application.Interfaces;
 
 namespace TodoApp.API.Controllers.V2;
 
-/// <summary>
-/// Categories Controller V2 - Gelişmiş kategori operasyonları
-/// </summary>
 [ApiController]
 [ApiVersion("2.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
-public class CategoriesController : ControllerBase
+[Produces("application/json")]
+public class CategoriesV2Controller : ControllerBase
 {
-    private readonly ICategoryService _categoryService;
-    private readonly ILogger<CategoriesController> _logger;
+    private readonly ICategoryService _service;
+    private readonly ILogger<CategoriesV2Controller> _logger;
 
-    public CategoriesController(ICategoryService categoryService, ILogger<CategoriesController> logger)
+    public CategoriesV2Controller(ICategoryService service, ILogger<CategoriesV2Controller> logger)
     {
-        _categoryService = categoryService;
+        _service = service;
         _logger = logger;
     }
 
-    /// <summary>Sayfalama ile kategorileri getirir (V2 özelliği)</summary>
+    // GET: api/v2/categories
     [HttpGet]
-    public async Task<ActionResult<PagedResult<CategoryDto>>> GetPagedCategories([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<CategoryDto>>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<IEnumerable<CategoryDto>>>> GetAll()
     {
-        try
-        {
-            var parameters = new PaginationParameters { PageNumber = pageNumber, PageSize = pageSize };
-            var result = await _categoryService.GetPagedCategoriesAsync(parameters);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while getting paged categories");
-            return StatusCode(500, "Internal server error");
-        }
+        var list = await _service.GetAllCategoriesAsync();
+        return Ok(new ApiResponse<IEnumerable<CategoryDto>>(list));
     }
 
-    /// <summary>ID'ye göre kategori getirir</summary>
-    [HttpGet("{id}")]
-    public async Task<ActionResult<CategoryDto>> GetCategory(int id)
+    // GET: api/v2/categories/5
+    [HttpGet("{id:int}")]
+    [ProducesResponseType(typeof(ApiResponse<CategoryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<CategoryDto>>> GetById(int id)
     {
-        try
-        {
-            var category = await _categoryService.GetCategoryByIdAsync(id);
-            if (category == null)
-                return NotFound($"Category with ID {id} not found");
-
-            return Ok(category);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, "Internal server error");
-        }
+        var item = await _service.GetCategoryByIdAsync(id);
+        if (item is null) return NotFound(new ProblemDetails { Title = "Not found", Status = 404 });
+        return Ok(new ApiResponse<CategoryDto>(item));
     }
 
-    /// <summary>Aktif kategorileri getirir</summary>
-    [HttpGet("active")]
-    public async Task<ActionResult<IEnumerable<CategoryDto>>> GetActiveCategories()
-    {
-        try
-        {
-            var categories = await _categoryService.GetActiveCategoriesAsync();
-            return Ok(categories);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, "Internal server error");
-        }
-    }
-
-    /// <summary>Kategori istatistikleri getirir (V2 yeni özellik)</summary>
-    [HttpGet("stats")]
-    public async Task<ActionResult<object>> GetCategoryStats()
-    {
-        try
-        {
-            var categories = await _categoryService.GetAllCategoriesAsync();
-            var stats = new
-            {
-                TotalCategories = categories.Count(),
-                ActiveCategories = categories.Count(c => c.IsActive),
-                InactiveCategories = categories.Count(c => !c.IsActive)
-            };
-            return Ok(stats);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while getting category stats");
-            return StatusCode(500, "Internal server error");
-        }
-    }
-
-    /// <summary>Yeni kategori oluşturur</summary>
+    // POST: api/v2/categories
     [HttpPost]
-    public async Task<ActionResult<CategoryDto>> CreateCategory(CreateCategoryDto createDto)
+    [ProducesResponseType(typeof(ApiResponse<CategoryDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ApiResponse<CategoryDto>>> Create([FromBody] CreateCategoryDto dto)
     {
-        try
-        {
-            var category = await _categoryService.CreateCategoryAsync(createDto);
-            return CreatedAtAction(nameof(GetCategory), new { id = category.Id }, category);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while creating category");
-            return StatusCode(500, "Internal server error");
-        }
+        var created = await _service.CreateCategoryAsync(dto);
+        return CreatedAtAction(nameof(GetById), new { id = created.Id, version = "2.0" }, new ApiResponse<CategoryDto>(created));
     }
 
-    /// <summary>Kategori günceller</summary>
-    [HttpPut("{id}")]
-    public async Task<ActionResult<CategoryDto>> UpdateCategory(int id, UpdateCategoryDto updateDto)
+    // PUT: api/v2/categories/5
+    [HttpPut("{id:int}")]
+    [ProducesResponseType(typeof(ApiResponse<CategoryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<CategoryDto>>> Update(int id, [FromBody] UpdateCategoryDto dto)
     {
-        try
-        {
-            var category = await _categoryService.UpdateCategoryAsync(id, updateDto);
-            if (category == null)
-                return NotFound($"Category with ID {id} not found");
-
-            return Ok(category);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, "Internal server error");
-        }
+        var updated = await _service.UpdateCategoryAsync(id, dto);
+        if (updated is null) return NotFound(new ProblemDetails { Title = "Not found", Status = 404 });
+        return Ok(new ApiResponse<CategoryDto>(updated, "Updated"));
     }
 
-    /// <summary>Kategoriyi aktif/pasif yapar (V2 yeni özellik)</summary>
-    [HttpPatch("{id}/toggle-status")]
-    public async Task<ActionResult<CategoryDto>> ToggleCategoryStatus(int id)
+    // DELETE: api/v2/categories/5
+    [HttpDelete("{id:int}")]
+    [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<bool>>> Delete(int id)
     {
-        try
-        {
-            var category = await _categoryService.GetCategoryByIdAsync(id);
-            if (category == null)
-                return NotFound($"Category with ID {id} not found");
-
-            var updateDto = new UpdateCategoryDto
-            {
-                Name = category.Name,
-                Description = category.Description,
-                IsActive = !category.IsActive
-            };
-
-            var updated = await _categoryService.UpdateCategoryAsync(id, updateDto);
-            return Ok(updated);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while toggling category status");
-            return StatusCode(500, "Internal server error");
-        }
-    }
-
-    /// <summary>Kategori siler</summary>
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteCategory(int id)
-    {
-        try
-        {
-            var result = await _categoryService.DeleteCategoryAsync(id);
-            if (!result)
-                return NotFound($"Category with ID {id} not found");
-
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, "Internal server error");
-        }
+        // FK nedeniyle InvalidOperationException fırlarsa global handler ProblemDetails döndürecek
+        var ok = await _service.DeleteCategoryAsync(id);
+        return Ok(new ApiResponse<bool>(ok, ok ? "Deleted" : "No change"));
     }
 }

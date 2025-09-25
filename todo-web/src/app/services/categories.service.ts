@@ -1,127 +1,91 @@
-import { Injectable, inject, signal, ApplicationRef } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { EMPTY, of } from 'rxjs';
-import { catchError, tap } from 'rxjs/operators';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { environment } from '../../environments/environment';
+import { BehaviorSubject, Observable, catchError, of, tap, map } from 'rxjs';
 
 export interface CategoryDto {
   id: number;
   name: string;
-  description?: string | null;
-  isActive?: boolean;
+  description?: string;
   createdAt?: string;
+  updatedAt?: string | null;
+}
+
+export interface CreateCategoryDto {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateCategoryDto {
+  name: string;
+  description?: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class CategoriesService {
   private http = inject(HttpClient);
-  private snack = inject(MatSnackBar);
-  private appRef = inject(ApplicationRef);
+  private base = '/api/v2/categories';
 
-  readonly categories = signal<CategoryDto[]>([]);
+  /** iç state */
+  private _categories = new BehaviorSubject<CategoryDto[]>([]);
+  /** ui tarafı bunu dinler */
+  readonly categories$ = this._categories.asObservable();
 
-  private tick() {
-    this.appRef.tick();
+  /** hafızadaki son liste */
+  get categories(): CategoryDto[] {
+    return this._categories.value;
   }
 
-  loadAll() {
-    this.http.get<CategoryDto[]>(`${environment.apiBase}/categories`).pipe(
-      tap(list => {
-        this.categories.set(list ?? []);
-        this.tick();
-      }),
+  /** tümünü çek */
+  load(): Observable<CategoryDto[]> {
+    return this.http.get<{ data: CategoryDto[] }>(this.base).pipe(
+      map(res => res.data),
+      tap(data => this._categories.next(data)),
       catchError(err => {
-        this.snack.open(this.msg(err, 'Kategori listesi alınamadı'), 'Kapat', { duration: 1600 });
+        console.error('categories load error', err);
+        this._categories.next([]);
         return of([]);
       })
-    ).subscribe();
+    );
   }
 
-  add(name: string) {
-    const prev = this.categories();
-    const optimistic: CategoryDto = { id: Date.now(), name: name.trim() };
+  add(name: string, description?: string): Observable<CategoryDto | null> {
+    const body: CreateCategoryDto = { name, description };
+    return this.http.post<{ data: CategoryDto }>(this.base, body).pipe(
+      map(res => res.data),
+      tap(category => this._categories.next([category, ...this.categories])),
+      catchError(err => {
+        console.error('category add error', err);
+        return of(null);
+      })
+    );
+  }
 
-    this.categories.set([optimistic, ...prev]);
-    this.tick();
-
-    this.http.post<CategoryDto>(`${environment.apiBase}/categories`, { name, isActive: true }).pipe(
-      tap(saved => {
-        const withReal = [saved, ...prev];
-        this.categories.set(withReal);
-        this.snack.open('Kategori eklendi', 'Kapat', { duration: 1200 });
-        this.tick();
+  update(id: number, name: string, description?: string): Observable<CategoryDto | null> {
+    const body: UpdateCategoryDto = { name, description };
+    return this.http.put<{ data: CategoryDto }>(`${this.base}/${id}`, body).pipe(
+      map(res => res.data),
+      tap(category => {
+        const list: CategoryDto[] = this.categories.map(c => (c.id === id ? category : c));
+        this._categories.next(list);
       }),
       catchError(err => {
-        this.categories.set(prev);
-        this.snack.open(this.msg(err, 'Kategori eklenemedi'), 'Kapat', { duration: 1800 });
-        this.tick();
-        return EMPTY;
+        console.error('category update error', err);
+        return of(null);
       })
-    ).subscribe();
+    );
   }
 
-  update(id: number, name: string) {
-    const prev = this.categories();
-    const patched = prev.map(c => c.id === id ? { ...c, name } : c);
-    this.categories.set(patched);
-    this.tick();
-
-    this.http.put<CategoryDto>(`${environment.apiBase}/categories/${id}`, { name, isActive: true }).pipe(
+  remove(id: number): Observable<boolean> {
+    return this.http.delete<{ data: boolean }>(`${this.base}/${id}`).pipe(
+      map(res => res.data),
       tap(() => {
-        this.snack.open('Kategori güncellendi', 'Kapat', { duration: 1200 });
-        this.tick();
+        const list: CategoryDto[] = this.categories.filter(c => c.id !== id);
+        this._categories.next(list);
       }),
       catchError(err => {
-        this.categories.set(prev);
-        this.snack.open(this.msg(err, 'Kategori güncellenemedi'), 'Kapat', { duration: 1800 });
-        this.tick();
-        return EMPTY;
+        console.error('category delete error', err);
+        return of(false);
       })
-    ).subscribe();
-  }
-
-  remove(id: number) {
-    const prev = this.categories();
-    const after = prev.filter(c => c.id !== id);
-    this.categories.set(after);
-    this.tick();
-
-    this.http.delete<void>(`${environment.apiBase}/categories/${id}`).pipe(
-      tap(() => {
-        this.snack.open('Kategori silindi', 'Kapat', { duration: 1200 });
-        this.tick();
-      }),
-      catchError(err => {
-        this.categories.set(prev);
-        this.snack.open(this.msg(err, 'Kategori silinemedi'), 'Kapat', { duration: 1800 });
-        this.tick();
-        return EMPTY;
-      })
-    ).subscribe();
-  }
-
-  toggleStatus(id: number) {
-    const prev = this.categories();
-    
-    this.http.patch<CategoryDto>(`/api/categories/${id}/toggle-status`, {}).pipe(
-      tap(updated => {
-        const list = this.categories().map(c => c.id === id ? updated : c);
-        this.categories.set(list);
-        this.snack.open('Kategori durumu değiştirildi', 'Kapat', { duration: 1200 });
-        this.tick();
-      }),
-      catchError(err => {
-        this.categories.set(prev);
-        this.snack.open(this.msg(err, 'Kategori durumu değiştirilemedi'), 'Kapat', { duration: 1800 });
-        this.tick();
-        return EMPTY;
-      })
-    ).subscribe();
-  }
-
-  private msg(err: any, fallback: string) {
-    const server = err?.error?.message || err?.error?.title || err?.message;
-    return server ? `${fallback}: ${server}` : fallback;
+    );
   }
 }

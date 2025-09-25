@@ -20,6 +20,9 @@ builder.Host.UseSerilog();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// AutoMapper (Application -> Mappings/MappingProfile.cs)
+builder.Services.AddAutoMapper(typeof(TodoApp.Application.Mappings.MappingProfile).Assembly);
+
 // Controllers + JSON
 builder.Services
     .AddControllers()
@@ -31,7 +34,6 @@ builder.Services
     })
     .ConfigureApiBehaviorOptions(o =>
     {
-        // FluentValidation/ModelState hatalarını tek tip döndür
         o.InvalidModelStateResponseFactory = ctx =>
             new BadRequestObjectResult(new ValidationProblemDetails(ctx.ModelState));
     });
@@ -59,14 +61,9 @@ builder.Services.AddCors(options =>
 {
     var origins = builder.Configuration.GetSection("Cors:Allowed").Get<string[]>() ?? Array.Empty<string>();
     if (origins.Length == 0)
-    {
-        // geliştirme için gevşek; prod’da listeyi doldur
         options.AddPolicy("Default", p => p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
-    }
     else
-    {
         options.AddPolicy("Default", p => p.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod());
-    }
 });
 
 var app = builder.Build();
@@ -102,7 +99,7 @@ app.UseExceptionHandler(errApp =>
     });
 });
 
-app.UseSerilogRequestLogging(); // request log’ları
+app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
 app.UseRouting();

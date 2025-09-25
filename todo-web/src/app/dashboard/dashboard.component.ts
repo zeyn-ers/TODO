@@ -17,19 +17,16 @@ export class DashboardComponent implements OnInit {
   catSvc = inject(CategoriesService);
   todoSvc = inject(TodosService);
 
-  // services tarafında BehaviorSubject -> asObservable vardı.
-  // burada signals ile bridge yapıyoruz (hafif ve basit):
+  // Store -> Signals
   categories = signal<CategoryDto[]>([]);
   todos = signal<TodoDto[]>([]);
 
   // UI state
-  q = signal('');                      // arama
-  selectedCatId = signal<number | 'all'>('all');   // kategori filtresi
+  q = signal('');                              // search query
+  selectedCatId = signal<number | 'all'>('all'); // sidebar seçimi
 
-  // quick add for category
+  // Forms
   catForm = this.fb.group({ name: ['', [Validators.required, Validators.maxLength(60)]] });
-
-  // quick add for todo
   todoForm = this.fb.group({
     title: ['', [Validators.required, Validators.maxLength(200)]],
     description: [''],
@@ -37,7 +34,7 @@ export class DashboardComponent implements OnInit {
     dueDate: [''],
   });
 
-  // filtered todos (search + category)
+  // Derived
   filtered = computed(() => {
     const q = this.q().toLowerCase().trim();
     const cid = this.selectedCatId();
@@ -51,46 +48,63 @@ export class DashboardComponent implements OnInit {
     });
   });
 
-  ngOnInit(): void {
-    this.catSvc.loadAll();
-    this.todoSvc.loadAll();
-    
-    // Signal'ları direkt kullan
-    effect(() => {
-      this.categories.set(this.catSvc.categories());
-      this.todos.set(this.todoSvc.todos());
-    });
+  // Notion crumbs için seçili kategori adı (template'te arrow fn kullanmamak için burada hesaplıyoruz)
+  selectedCategoryName = computed(() => {
+    const cid = this.selectedCatId();
+    if (cid === 'all') return 'Tümü';
+    const c = this.categories().find(cat => cat.id === cid);
+    return c?.name ?? 'Seçilmedi';
+  });
 
-    // varsayılan: todo formu kategori seçimi sidebar seçimi ile eşitlensin
+  // Satırdaki kategori ID'den isme gider (template-friendly helper)
+  catNameById(id?: number | null): string {
+    if (id == null) return '—';
+    const c = this.categories().find(cat => cat.id === id);
+    return c?.name ?? '—';
+  }
+
+  ngOnInit(): void {
+    this.catSvc.categories$.subscribe(list => this.categories.set(list));
+    this.todoSvc.todos$.subscribe(list => this.todos.set(list));
+
+    // sidebar seçimi -> quick add formundaki kategori alanına yansısın
     effect(() => {
       const cid = this.selectedCatId();
       this.todoForm.patchValue({ categoryId: cid === 'all' ? 'all' : cid }, { emitEvent: false });
     });
   }
 
-  // --- Sidebar actions
+  // Sidebar actions
   addCategory() {
     const name = (this.catForm.value.name || '').trim();
     if (!name) return;
     this.catSvc.add(name);
     this.catForm.reset({ name: '' });
   }
-  pickCat(id: number | 'all') { this.selectedCatId.set(id); }
+  pickCat(id: number | 'all') {
+    this.selectedCatId.set(id);
+  }
 
-  // --- Todos actions
+  // Todos actions
   addTodo() {
     if (this.todoForm.invalid) return;
     const v = this.todoForm.value;
     this.todoSvc.add({
       title: v.title!,
       description: v.description || '',
-      priority: 1,
-      categoryId: v.categoryId === 'all' ? null : (v.categoryId as number),
-      dueDate: v.dueDate ? new Date(v.dueDate as any).toISOString() : null,
+      categoryId: v.categoryId === 'all' ? undefined : (v.categoryId as number),
+      dueDate: v.dueDate ? new Date(v.dueDate as any).toISOString() : undefined,
     });
-    this.todoForm.reset({ title: '', description: '', categoryId: this.selectedCatId(), dueDate: '' });
+    this.todoForm.reset({
+      title: '',
+      description: '',
+      categoryId: this.selectedCatId(),
+      dueDate: '',
+    });
   }
-  toggleDone(t: TodoDto) { this.todoSvc.toggle(t.id); }
+  toggleDone(t: TodoDto) {
+    this.todoSvc.toggle(t.id);
+  }
   removeTodo(t: TodoDto) {
     if (confirm(`Silinsin mi?\n- ${t.title}`)) this.todoSvc.remove(t.id);
   }
