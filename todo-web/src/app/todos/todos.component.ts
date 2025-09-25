@@ -9,7 +9,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 
 import { TodosService, TodoDto } from '../services/todos.service';
 
@@ -31,7 +31,7 @@ import { TodosService, TodoDto } from '../services/todos.service';
         <mat-chip (click)="loadAll()" [highlighted]="currentView === 'all'">Tümü</mat-chip>
         <mat-chip (click)="loadCompleted()" [highlighted]="currentView === 'completed'">Tamamlanan</mat-chip>
         <mat-chip (click)="loadPending()" [highlighted]="currentView === 'pending'">Bekleyen</mat-chip>
-        <mat-chip (click)="loadPaged()" [highlighted]="currentView === 'paged'">Sayfalı (V2)</mat-chip>
+        <mat-chip (click)="loadPaged()" [highlighted]="currentView === 'paged'">Sayfalı (Basit)</mat-chip>
       </mat-chip-set>
 
       <form [formGroup]="form" (ngSubmit)="onAdd()" style="display:flex;gap:8px;margin-bottom:16px">
@@ -42,11 +42,11 @@ import { TodosService, TodoDto } from '../services/todos.service';
         <button mat-raised-button color="primary" type="submit">Ekle</button>
       </form>
 
-      <!-- Sayfalı Görünüm -->
-      <div *ngIf="currentView === 'paged' && pagedTodos()">
-        <p>Toplam: {{pagedTodos()?.totalCount}} | Sayfa: {{pagedTodos()?.pageNumber}}/{{pagedTodos()?.totalPages}}</p>
+      <!-- Sayfalı Görünüm (basit client-side) -->
+      <div *ngIf="currentView === 'paged'">
+        <p>Toplam: {{todos.length}} | Sayfa: {{pageIndex+1}}</p>
         <mat-list>
-          <mat-list-item *ngFor="let t of pagedTodos()?.items">
+          <mat-list-item *ngFor="let t of paged">
             <mat-checkbox [checked]="t.isCompleted" (change)="onToggle(t)"></mat-checkbox>
             <div matListItemTitle [style.textDecoration]="t.isCompleted ? 'line-through' : 'none'">
               {{ t.title }}
@@ -57,18 +57,18 @@ import { TodosService, TodoDto } from '../services/todos.service';
           </mat-list-item>
         </mat-list>
         <mat-paginator 
-          [length]="pagedTodos()?.totalCount || 0"
-          [pageSize]="10"
-          [pageIndex]="(pagedTodos()?.pageNumber || 1) - 1"
+          [length]="todos.length"
+          [pageSize]="pageSize"
+          [pageIndex]="pageIndex"
           (page)="onPageChange($event)">
         </mat-paginator>
       </div>
 
       <!-- Normal Görünüm -->
       <mat-list *ngIf="currentView !== 'paged'">
-        <mat-list-item *ngFor="let t of todos()">
+        <mat-list-item *ngFor="let t of todos">
           <mat-checkbox [checked]="t.isCompleted" (change)="onToggle(t)"></mat-checkbox>
-          <div matListItemTitle [style.textDecoration]="t.isCompleted ? 'line-through' : 'none'">
+        <div matListItemTitle [style.textDecoration]="t.isCompleted ? 'line-through' : 'none'">
             {{ t.title }}
           </div>
           <button mat-icon-button (click)="onDelete(t)" color="warn">
@@ -85,8 +85,14 @@ export class TodosComponent implements OnInit {
   private fb = inject(FormBuilder);
   private appRef = inject(ApplicationRef);
 
-  todos = this.svc.todos;
-  pagedTodos = this.svc.pagedTodos;
+  // array (signal değil)
+  todos: TodoDto[] = this.svc.todos;
+
+  // simple paged view (client-side)
+  paged: TodoDto[] = [];
+  pageIndex = 0;
+  pageSize = 10;
+
   form = this.fb.nonNullable.group({ title: [''] });
   currentView: 'all' | 'completed' | 'pending' | 'paged' = 'all';
 
@@ -94,48 +100,58 @@ export class TodosComponent implements OnInit {
     this.loadAll();
   }
 
+  private refreshLocal() {
+    this.todos = this.svc.todos;
+    if (this.currentView === 'paged') {
+      const start = this.pageIndex * this.pageSize;
+      this.paged = this.todos.slice(start, start + this.pageSize);
+    }
+    this.appRef.tick();
+  }
+
   loadAll() {
     this.currentView = 'all';
-    this.svc.loadAll();
+    this.svc.loadAll().subscribe(() => this.refreshLocal());
   }
 
   loadCompleted() {
     this.currentView = 'completed';
-    this.svc.loadCompleted();
+    this.svc.loadCompleted().subscribe(() => this.refreshLocal());
   }
 
   loadPending() {
     this.currentView = 'pending';
-    this.svc.loadPending();
+    this.svc.loadPending().subscribe(() => this.refreshLocal());
   }
 
   loadPaged() {
     this.currentView = 'paged';
-    this.svc.loadPaged(1, 10);
+    this.pageIndex = 0;
+    this.svc.loadAll().subscribe(() => this.refreshLocal());
   }
 
-  onPageChange(event: any) {
-    this.svc.loadPaged(event.pageIndex + 1, event.pageSize);
+  onPageChange(event: PageEvent) {
+    this.pageIndex = event.pageIndex;
+    this.pageSize = event.pageSize;
+    this.refreshLocal();
   }
 
   onAdd() {
     const title = this.form.value.title?.trim();
     if (!title) return;
-    
-    this.svc.add({ title, description: '', priority: 1 });
-    this.form.reset();
-    this.appRef.tick();
+    this.svc.add({ title, description: '', priority: 1 }).subscribe(() => {
+      this.form.reset();
+      this.refreshLocal();
+    });
   }
 
   onToggle(t: TodoDto) {
-    this.svc.toggle(t.id);
-    this.appRef.tick();
+    this.svc.toggle(t.id).subscribe(() => this.refreshLocal());
   }
 
   onDelete(t: TodoDto) {
     if (confirm(`Sil: ${t.title}?`)) {
-      this.svc.remove(t.id);
-      this.appRef.tick();
+      this.svc.remove(t.id).subscribe(() => this.refreshLocal());
     }
   }
 }

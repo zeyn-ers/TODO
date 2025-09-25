@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, Injector } from '@angular/core';
 import { CommonModule, NgFor, NgIf } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
@@ -14,6 +14,8 @@ import { TodosService, TodoDto } from '../services/todos.service';
 })
 export class DashboardComponent implements OnInit {
   private fb = inject(FormBuilder);
+  private injector = inject(Injector);
+
   catSvc = inject(CategoriesService);
   todoSvc = inject(TodosService);
 
@@ -22,7 +24,7 @@ export class DashboardComponent implements OnInit {
   todos = signal<TodoDto[]>([]);
 
   // UI state
-  q = signal('');                              // search query
+  q = signal('');                               // search query
   selectedCatId = signal<number | 'all'>('all'); // sidebar seçimi
 
   // Forms
@@ -48,7 +50,7 @@ export class DashboardComponent implements OnInit {
     });
   });
 
-  // Notion crumbs için seçili kategori adı (template'te arrow fn kullanmamak için burada hesaplıyoruz)
+  // Notion crumbs için seçili kategori adı
   selectedCategoryName = computed(() => {
     const cid = this.selectedCatId();
     if (cid === 'all') return 'Tümü';
@@ -63,15 +65,26 @@ export class DashboardComponent implements OnInit {
     return c?.name ?? '—';
   }
 
+  // effect referansı (GC olmasın)
+  private autoSync!: ReturnType<typeof effect>;
+
   ngOnInit(): void {
+    // başlangıç verilerini yükle
+    this.catSvc.load().subscribe();
+    this.todoSvc.load(true).subscribe();
+
+    // store abonelikleri
     this.catSvc.categories$.subscribe(list => this.categories.set(list));
     this.todoSvc.todos$.subscribe(list => this.todos.set(list));
 
     // sidebar seçimi -> quick add formundaki kategori alanına yansısın
-    effect(() => {
+    this.autoSync = effect(() => {
       const cid = this.selectedCatId();
-      this.todoForm.patchValue({ categoryId: cid === 'all' ? 'all' : cid }, { emitEvent: false });
-    });
+      this.todoForm.patchValue(
+        { categoryId: cid === 'all' ? 'all' : cid },
+        { emitEvent: false }
+      );
+    }, { injector: this.injector });
   }
 
   // Sidebar actions

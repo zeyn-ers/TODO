@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, computed, ApplicationRef } from '@angular/core';
+import { Component, OnInit, inject, ApplicationRef } from '@angular/core';
 import { CommonModule, NgFor } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators, FormsModule } from '@angular/forms';
 
@@ -77,7 +77,7 @@ import { TodosService, TodoDto } from '../services/todos.service';
             <mat-label>Kategori filtresi</mat-label>
             <mat-select [(ngModel)]="filterCatId" aria-label="Kategori filtresi">
               <mat-option [value]="null">Hepsi</mat-option>
-              <mat-option *ngFor="let c of categories(); trackBy: trackId" [value]="c.id">{{ c.name }}</mat-option>
+              <mat-option *ngFor="let c of categories; trackBy: trackId" [value]="c.id">{{ c.name }}</mat-option>
             </mat-select>
           </mat-form-field>
 
@@ -105,7 +105,7 @@ import { TodosService, TodoDto } from '../services/todos.service';
               <mat-label>Kategori</mat-label>
               <mat-select formControlName="categoryId" aria-label="Kategori seç">
                 <mat-option [value]="null">— Yok —</mat-option>
-                <mat-option *ngFor="let c of categories(); trackBy: trackId" [value]="c.id">{{ c.name }}</mat-option>
+                <mat-option *ngFor="let c of categories; trackBy: trackId" [value]="c.id">{{ c.name }}</mat-option>
               </mat-select>
             </mat-form-field>
 
@@ -139,7 +139,7 @@ import { TodosService, TodoDto } from '../services/todos.service';
               </div>
             </div>
 
-            <div *ngIf="todos().length === 0" class="muted" style="padding:.5rem 0;">
+            <div *ngIf="todos.length === 0" class="muted" style="padding:.5rem 0;">
               Henüz todo yok. Yukarıdan hemen ekleyebilirsin.
             </div>
           </div>
@@ -171,7 +171,7 @@ import { TodosService, TodoDto } from '../services/todos.service';
           <mat-divider></mat-divider>
 
           <div style="margin-top:1rem">
-            <mat-chip *ngFor="let c of categories(); trackBy: trackId" class="category-chip" selected>
+            <mat-chip *ngFor="let c of categories; trackBy: trackId" class="category-chip" selected>
               <mat-icon>folder</mat-icon>&nbsp; {{ c.name }}
               <button mat-icon-button (click)="onEdit(c)" matTooltip="Düzenle" aria-label="Kategori düzenle" style="margin-left:.25rem">
                 <mat-icon style="font-size:18px">edit</mat-icon>
@@ -196,8 +196,9 @@ export class CategoriesComponent implements OnInit {
   private snack = inject(MatSnackBar);
   private appRef = inject(ApplicationRef);
 
-  categories = this.svc.categories;
-  todos = this.todosSvc.todos;
+  // array (signal değil)
+  categories: CategoryDto[] = this.svc.categories;
+  todos: TodoDto[] = this.todosSvc.todos;
 
   catForm = this.fb.nonNullable.group({ name: ['', [Validators.required, Validators.maxLength(60)]] });
   todoForm = this.fb.nonNullable.group({
@@ -208,8 +209,14 @@ export class CategoriesComponent implements OnInit {
   filterCatId: number | null = null;
 
   ngOnInit() {
-    this.svc.loadAll();
-    this.todosSvc.loadAll();
+    this.svc.loadAll().subscribe(() => {
+      this.categories = this.svc.categories;
+      this.appRef.tick();
+    });
+    this.todosSvc.loadAll().subscribe(() => {
+      this.todos = this.todosSvc.todos;
+      this.appRef.tick();
+    });
   }
 
   /** listelerde performans için */
@@ -219,22 +226,32 @@ export class CategoriesComponent implements OnInit {
   onAdd() {
     const name = (this.catForm.value.name || '').trim();
     if (!name) return;
-    this.svc.add(name);
+    this.svc.add(name).subscribe(() => {
+      this.categories = this.svc.categories;
+      this.appRef.tick();
+    });
     this.catForm.reset({ name: '' });
-    this.appRef.tick();
   }
 
   onEdit(c: CategoryDto) {
     const ref = this.dialog.open(CategoryEditDialogComponent, { data: { name: c.name }, width: '360px' });
     ref.afterClosed().subscribe(val => {
       const name = typeof val === 'string' ? val.trim() : '';
-      if (name && name !== c.name) this.svc.update(c.id, name);
+      if (name && name !== c.name) {
+        this.svc.update(c.id, name).subscribe(() => {
+          this.categories = this.svc.categories;
+          this.appRef.tick();
+        });
+      }
     });
   }
 
   onDelete(c: CategoryDto) {
     if (!confirm(`Silinsin mi?\n- ${c.name}`)) return;
-    this.svc.remove(c.id);
+    this.svc.remove(c.id).subscribe(() => {
+      this.categories = this.svc.categories;
+      this.appRef.tick();
+    });
   }
 
   // --- Todo işlemleri ---
@@ -242,29 +259,39 @@ export class CategoriesComponent implements OnInit {
     if (this.todoForm.invalid) return;
     const v = this.todoForm.getRawValue();
     const title = v.title.trim(); if (!title) return;
-    this.todosSvc.add({ title, description: '', priority: 1, categoryId: v.categoryId ?? null });
+    this.todosSvc.add({ title, description: '', priority: 1, categoryId: v.categoryId ?? null })
+      .subscribe(() => {
+        this.todos = this.todosSvc.todos;
+        this.appRef.tick();
+      });
     this.todoForm.reset({ title: '', categoryId: v.categoryId ?? null });
-    this.appRef.tick();
   }
 
   toggleDone(t: TodoDto) {
-    this.todosSvc.toggle(t.id);
-    this.appRef.tick();
+    this.todosSvc.toggle(t.id).subscribe(() => {
+      this.todos = this.todosSvc.todos;
+      this.appRef.tick();
+    });
   }
 
   removeTodo(id: number) {
-    this.todosSvc.remove(id);
-    this.appRef.tick();
+    this.todosSvc.remove(id).subscribe(() => {
+      this.todos = this.todosSvc.todos;
+      this.appRef.tick();
+    });
   }
 
   clearDone() {
-    this.todosSvc.clearCompleted();
-    this.appRef.tick();
+    this.todosSvc.clearCompleted().subscribe(() => {
+      this.todos = this.todosSvc.todos;
+      this.appRef.tick();
+    });
   }
 
-  filteredTodos = computed(() => {
-    const list = this.todos();
+  // array tabanlı filtre
+  filteredTodos() {
+    const list = this.todos;
     if (this.filterCatId == null) return list;
     return list.filter(t => t.categoryId === this.filterCatId);
-  });
+  }
 }

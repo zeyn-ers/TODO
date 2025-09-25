@@ -1,46 +1,14 @@
-/* ==== Tema değişkenleri (Notion-vari pastel) ==== */
-:root{
-  --bg: #f7f8fb;
-  --surface: #ffffff;
-  --border: #e6e8ef;
-  --text: #1f2937;
-  --muted: #6b7280;
-  --primary: #6366f1;      /* mor */
-  --primary-weak: #eef2ff; /* morun çok açık tonu */
-  --success: #22c55e;
-  --danger: #ef4444;
-  --radius: 14px;
-  --shadow: 0 6px 16px rgba(0,0,0,0.06);
+.header{
+  display:flex; align-items:center; gap:.75rem;
+  padding:.75rem 1rem; position:sticky; top:0; z-index:10;
+  background: rgba(255,255,255,.7); backdrop-filter: blur(8px);
+  border-bottom:1px solid var(--border);
 }
-
-html, body { height: 100%; }
-body { margin:0; background: var(--bg); color: var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-
-.shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; }
-.topbar{
-  backdrop-filter: saturate(1.1) blur(6px);
-  position: sticky; top: 0; z-index: 5;
-  background: color-mix(in oklab, var(--surface) 80%, transparent);
-  border-bottom: 1px solid var(--border);
-  padding: 10px 18px; display: flex; align-items: center; gap: 16px;
+.brand{ font-weight:800; letter-spacing:.2px; }
+.header .search{
+  margin-left:auto; display:flex; align-items:center; gap:.5rem;
+  background:#fff; border:1px solid var(--border); border-radius:12px; padding:.35rem .5rem;
 }
-.brand{ font-weight: 700; letter-spacing:.2px }
-.tabs a{ color: var(--muted); text-decoration:none; margin-right:14px; padding:8px 10px; border-radius:10px }
-.tabs a.active{ background: var(--primary-weak); color: var(--primary); font-weight:600 }
-
-.content.two-col{
-  --gap: 22px;
-  display: grid; gap: var(--gap);
-  grid-template-columns: minmax(520px, 1fr) 360px; /* sol geniş, sağ sabit */
-  padding: 22px;
-}
-.col{
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px;
-}
-
-/* Mobil kırılım */
-@media (max-width: 980px){
-  .content.two-col{ grid-template-columns: 1fr; }
-  .cats-col{ order: -1; } /* mobilde kategoriler üste */
+.header .search input{
+  border:none; outline:none; background:transparent; width:220px;
 }
