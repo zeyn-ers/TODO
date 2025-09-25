@@ -1,111 +1,119 @@
-<div class="grid">
+<div class="layout">
 
-  <!-- Sidebar (Categories) -->
-  <aside class="sidebar card">
-    <div class="sb-header">
-      <div class="title">Kategoriler</div>
-      <span class="muted">{{ categories().length }} adet</span>
+  <!-- HEADER (Notion page header: emoji + title) -->
+  <header class="page-head">
+    <button class="emoji-btn" (click)="emojiPickerFor.set('page')">{{ pageIcon() }}</button>
+    <input class="title-input"
+           [value]="pageTitle()"
+           (input)="saveTitle($any($event.target).value)"
+           placeholder="Untitled" />
+    <div class="head-tools">
+      <input class="search" placeholder="Ara..." [value]="q()" (input)="q.set($any($event.target).value)" />
+      <button class="btn accent" (click)="addTodo()">+ Yeni</button>
     </div>
 
-    <div class="sb-add">
-      <input class="input" placeholder="Yeni kategori..." [formControl]="catForm.controls.name" />
-      <button class="btn" (click)="addCategory()">Ekle</button>
+    <!-- emoji picker (page) -->
+    <div class="emoji-pop" *ngIf="emojiPickerFor()==='page'">
+      <div class="emoji-grid">
+        <button *ngFor="let e of emojiPalette" (click)="setPageIcon(e)">{{e}}</button>
+      </div>
+      <button class="close" (click)="emojiPickerFor.set(null)">✕</button>
     </div>
+  </header>
 
-    <ul class="cat-list">
-      <li class="cat" [class.active]="selectedCatId()==='all'" (click)="pickCat('all')">
-        <span class="dot all"></span> Tümü
-      </li>
-      <li
-        class="cat"
-        *ngFor="let c of categories()"
-        [class.active]="selectedCatId()===c.id"
-        (click)="pickCat(c.id)">
-        <span class="dot"></span> {{ c.name }}
-      </li>
-    </ul>
-
-    <hr class="sep" />
-    <div class="info muted">
-      <div class="tag">Notion-style UI</div>
-      <div>Solda filtre, sağda içerik. Hızlı ekleme alanları 🪄</div>
-    </div>
-  </aside>
-
-  <!-- Main content (Todos) -->
-  <section class="content">
-    <!-- Toolbar -->
-    <div class="toolbar card">
-      <div class="crumbs">
-        <span class="pill">Dashboard</span>
-        <span class="muted">/</span>
-        <span class="pill">{{ selectedCategoryName() }}</span>
+  <div class="grid">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sb-header">
+        <div class="label">Kategoriler</div>
+        <span class="muted">{{ categories().length }} adet</span>
       </div>
 
-      <div class="tools">
-        <input
-          class="input"
-          placeholder="Todo ara..."
-          [value]="q()"
-          (input)="q.set($any($event.target).value)" />
-        <button class="btn accent" (click)="addTodo()">+ Yeni</button>
-      </div>
-    </div>
-
-    <!-- Quick add -->
-    <div class="quick card">
-      <input class="input w" placeholder="Başlık" [formControl]="todoForm.controls.title" />
-      <input class="input" placeholder="Açıklama" [formControl]="todoForm.controls.description" />
-      <select class="input" [formControl]="todoForm.controls.categoryId">
-        <option value="all">Kategori yok</option>
-        <option *ngFor="let c of categories()" [value]="c.id">{{ c.name }}</option>
-      </select>
-      <input class="input" type="date" [formControl]="todoForm.controls.dueDate" />
-      <button class="btn" (click)="addTodo()">Ekle</button>
-    </div>
-
-    <!-- Notion-like table -->
-    <div class="table card">
-      <div class="thead">
-        <div>Durum</div>
-        <div>Başlık</div>
-        <div>Kategori</div>
-        <div>Son Tarih</div>
-        <div class="right">İşlem</div>
+      <div class="sb-add">
+        <input class="input" placeholder="Yeni kategori..." [formControl]="catForm.controls.name" />
+        <button class="btn" (click)="addCategory()">Ekle</button>
       </div>
 
-      <div class="row" *ngFor="let t of filtered()">
-        <div>
-          <input type="checkbox" [checked]="t.isCompleted" (change)="toggleDone(t)" />
-        </div>
+      <ul class="cat-list">
+        <li class="cat" [class.active]="selectedCatId()==='all'" (click)="pickCat('all')">
+          <span class="dot all"></span> Tümü
+        </li>
 
-        <div class="title-cell">
-          <div class="t">{{ t.title }}</div>
-          <div class="d muted" *ngIf="t.description">{{ t.description }}</div>
-        </div>
+        <li class="cat" *ngFor="let c of categories()" [class.active]="selectedCatId()===c.id">
+          <button class="emoji-btn small" (click)="emojiPickerFor.set(c.id); $event.stopPropagation()">
+            {{ iconForCategory(c.id) }}
+          </button>
+          <span class="name" (click)="pickCat(c.id)">{{ c.name }}</span>
 
-        <div>
-          <span class="pill" *ngIf="t.categoryId as cid; else noCat">
-            {{ catNameById(cid) }}
-          </span>
-          <ng-template #noCat>
-            <span class="muted">—</span>
-          </ng-template>
-        </div>
+          <!-- emoji picker (category) -->
+          <div class="emoji-pop" *ngIf="emojiPickerFor()===c.id">
+            <div class="emoji-grid">
+              <button *ngFor="let e of emojiPalette" (click)="setCatIcon(c.id, e)">{{e}}</button>
+            </div>
+            <button class="close" (click)="emojiPickerFor.set(null)">✕</button>
+          </div>
+        </li>
+      </ul>
 
-        <div>
-          <span class="muted" *ngIf="!t.dueDate">—</span>
-          <span *ngIf="t.dueDate as d">{{ d | date:'dd.MM.yyyy' }}</span>
-        </div>
+      <hr class="sep" />
+      <div class="muted small">
+        Solda filtre, sağda içerik. Notion-style 🪄
+      </div>
+    </aside>
 
-        <div class="right">
-          <button class="btn" (click)="removeTodo(t)">Sil</button>
-        </div>
+    <!-- CONTENT -->
+    <section class="content">
+      <!-- Quick add row -->
+      <div class="quick">
+        <input class="input w" placeholder="Başlık" [formControl]="todoForm.controls.title" />
+        <input class="input w" placeholder="Açıklama" [formControl]="todoForm.controls.description" />
+        <select class="input" [formControl]="todoForm.controls.categoryId">
+          <option value="all">Kategori yok</option>
+          <option *ngFor="let c of categories()" [value]="c.id">
+            {{ iconForCategory(c.id) }} {{ c.name }}
+          </option>
+        </select>
+        <input class="input" type="date" [formControl]="todoForm.controls.dueDate" />
+        <button class="btn" (click)="addTodo()">Ekle</button>
       </div>
 
-      <div class="empty muted" *ngIf="filtered().length===0">
-        Hiç kayıt yok. Üstteki “Yeni” ile hızlıca ekleyebilirsin.
+      <!-- List (block-style) -->
+      <div class="table">
+        <div class="thead">
+          <div>Durum</div>
+          <div>Başlık</div>
+          <div>Kategori</div>
+          <div>Son Tarih</div>
+          <div class="right">İşlem</div>
+        </div>
+
+        <div class="row" *ngFor="let t of filtered()">
+          <div>
+            <input type="checkbox" [checked]="t.isCompleted" (change)="toggleDone(t)" />
+          </div>
+          <div class="title-cell">
+            <div class="t">{{ t.title }}</div>
+            <div class="d muted" *ngIf="t.description">{{ t.description }}</div>
+          </div>
+          <div>
+            <span class="pill" *ngIf="t.categoryId as cid; else noCat">
+              {{ iconForCategory(cid) }} {{ catNameById(cid) }}
+            </span>
+            <ng-template #noCat><span class="muted">—</span></ng-template>
+          </div>
+          <div>
+            <span class="muted" *ngIf="!t.dueDate">—</span>
+            <span *ngIf="t.dueDate as d">{{ d | date:'dd.MM.yyyy' }}</span>
+          </div>
+          <div class="right">
+            <button class="btn" (click)="removeTodo(t)">Sil</button>
+          </div>
+        </div>
+
+        <div class="empty muted" *ngIf="filtered().length===0">
+          Hiç kayıt yok. Üstteki “Yeni” ile hızlıca ekleyebilirsin.
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
+  </div>
 </div>

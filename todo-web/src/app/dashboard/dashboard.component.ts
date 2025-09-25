@@ -5,6 +5,8 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CategoriesService, CategoryDto } from '../services/categories.service';
 import { TodosService, TodoDto } from '../services/todos.service';
 
+type CatIconMap = Record<number, string>;
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -24,8 +26,20 @@ export class DashboardComponent implements OnInit {
   todos = signal<TodoDto[]>([]);
 
   // UI state
-  q = signal('');                               // search query
-  selectedCatId = signal<number | 'all'>('all'); // sidebar seçimi
+  q = signal('');
+  selectedCatId = signal<number | 'all'>('all');
+
+  // Notion-style page info (localStorage)
+  pageTitle = signal<string>(localStorage.getItem('pageTitle') ?? 'başlık');
+  pageIcon  = signal<string>(localStorage.getItem('pageIcon')  ?? '🗒️');
+
+  // Kategori emoji haritası (localStorage)
+  catIcons = signal<CatIconMap>(JSON.parse(localStorage.getItem('catIcons') ?? '{}'));
+  emojiPalette = [
+    '📁','🗂️','📝','✅','🔥','⭐','💡','📚','🎯','⚙️',
+    '💻','📅','🧠','🛠️','🧪','🎨','🧹','🥇','🪄','📌'
+  ];
+  emojiPickerFor = signal<number | 'page' | null>(null);
 
   // Forms
   catForm = this.fb.group({ name: ['', [Validators.required, Validators.maxLength(60)]] });
@@ -50,7 +64,6 @@ export class DashboardComponent implements OnInit {
     });
   });
 
-  // Notion crumbs için seçili kategori adı
   selectedCategoryName = computed(() => {
     const cid = this.selectedCatId();
     if (cid === 'all') return 'Tümü';
@@ -58,26 +71,43 @@ export class DashboardComponent implements OnInit {
     return c?.name ?? 'Seçilmedi';
   });
 
-  // Satırdaki kategori ID'den isme gider (template-friendly helper)
+  // helpers
+  iconForCategory(id: number): string {
+    return this.catIcons()[id] ?? '📁';
+  }
+  setCatIcon(id: number, icon: string) {
+    const next = { ...this.catIcons(), [id]: icon };
+    this.catIcons.set(next);
+    localStorage.setItem('catIcons', JSON.stringify(next));
+    this.emojiPickerFor.set(null);
+  }
+  setPageIcon(icon: string) {
+    this.pageIcon.set(icon);
+    localStorage.setItem('pageIcon', icon);
+    this.emojiPickerFor.set(null);
+  }
+  saveTitle(v: string) {
+    this.pageTitle.set(v || 'başlık');
+    localStorage.setItem('pageTitle', this.pageTitle());
+  }
+
   catNameById(id?: number | null): string {
     if (id == null) return '—';
     const c = this.categories().find(cat => cat.id === id);
     return c?.name ?? '—';
   }
 
-  // effect referansı (GC olmasın)
   private autoSync!: ReturnType<typeof effect>;
 
   ngOnInit(): void {
-    // başlangıç verilerini yükle
+    // yükle
     this.catSvc.load().subscribe();
     this.todoSvc.load(true).subscribe();
 
-    // store abonelikleri
     this.catSvc.categories$.subscribe(list => this.categories.set(list));
     this.todoSvc.todos$.subscribe(list => this.todos.set(list));
 
-    // sidebar seçimi -> quick add formundaki kategori alanına yansısın
+    // sidebar seçimi -> form kategori alanına
     this.autoSync = effect(() => {
       const cid = this.selectedCatId();
       this.todoForm.patchValue(
@@ -94,9 +124,7 @@ export class DashboardComponent implements OnInit {
     this.catSvc.add(name);
     this.catForm.reset({ name: '' });
   }
-  pickCat(id: number | 'all') {
-    this.selectedCatId.set(id);
-  }
+  pickCat(id: number | 'all') { this.selectedCatId.set(id); }
 
   // Todos actions
   addTodo() {
@@ -115,10 +143,6 @@ export class DashboardComponent implements OnInit {
       dueDate: '',
     });
   }
-  toggleDone(t: TodoDto) {
-    this.todoSvc.toggle(t.id);
-  }
-  removeTodo(t: TodoDto) {
-    if (confirm(`Silinsin mi?\n- ${t.title}`)) this.todoSvc.remove(t.id);
-  }
+  toggleDone(t: TodoDto) { this.todoSvc.toggle(t.id); }
+  removeTodo(t: TodoDto) { if (confirm(`Silinsin mi?\n- ${t.title}`)) this.todoSvc.remove(t.id); }
 }

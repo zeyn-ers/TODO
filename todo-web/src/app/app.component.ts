@@ -5,7 +5,14 @@ import { RouterOutlet } from '@angular/router';
   selector: 'app-root',
   standalone: true,
   imports: [RouterOutlet],
-  templateUrl: './app.html',
-  styleUrls: ['./app.scss'],
+  template: `
+    <div class="header">
+      <div class="brand">TodoWeb</div>
+      <div class="search"><input placeholder="Ara..." /></div>
+    </div>
+
+    <!-- sayfalar burada render edilecek -->
+    <router-outlet></router-outlet>
+  `,
 })
 export class AppComponent {}
