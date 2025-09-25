@@ -6,8 +6,9 @@ using Microsoft.AspNetCore.Mvc.Versioning;
 using TodoApp.Infrastructure;
 using TodoApp.Application;
 
-// Serilog konfigürasyonu
 Log.Logger = new LoggerConfiguration()
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("App", "TodoApp")
     .WriteTo.Console()
     .WriteTo.File("logs/todoapp-.txt", rollingInterval: RollingInterval.Day)
     .CreateLogger();
@@ -15,92 +16,97 @@ Log.Logger = new LoggerConfiguration()
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog();
 
-// Infrastructure ve Application katmanlarını kaydet
-builder.Services.AddInfrastructure(builder.Configuration);
+// ===== Services =====
 builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
 
-// AutoMapper
-builder.Services.AddAutoMapper(typeof(TodoApp.Application.Mappings.MappingProfile));
+// Controllers + JSON
+builder.Services
+    .AddControllers()
+    .AddJsonOptions(o =>
+    {
+        o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        o.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+        o.JsonSerializerOptions.PropertyNamingPolicy = null;
+    })
+    .ConfigureApiBehaviorOptions(o =>
+    {
+        // FluentValidation/ModelState hatalarını tek tip döndür
+        o.InvalidModelStateResponseFactory = ctx =>
+            new BadRequestObjectResult(new ValidationProblemDetails(ctx.ModelState));
+    });
 
-// API Versioning
+// API versioning + explorer
 builder.Services.AddApiVersioning(opt =>
 {
-    opt.DefaultApiVersion = new ApiVersion(1, 0);
+    opt.DefaultApiVersion = new ApiVersion(2, 0);
     opt.AssumeDefaultVersionWhenUnspecified = true;
-    opt.ApiVersionReader = ApiVersionReader.Combine(
-        new UrlSegmentApiVersionReader(),
-        new QueryStringApiVersionReader("version"),
-        new HeaderApiVersionReader("X-Version")
-    );
+    opt.ReportApiVersions = true;
+    opt.ApiVersionReader = new UrlSegmentApiVersionReader();
 });
-
 builder.Services.AddVersionedApiExplorer(setup =>
 {
     setup.GroupNameFormat = "'v'VVV";
     setup.SubstituteApiVersionInUrl = true;
 });
 
-// Controllers (+ JSON güvenli ayar)
-builder.Services
-    .AddControllers()
-    .AddJsonOptions(o =>
-    {
-        o.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
-        o.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-    });
-
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new() { Title = "TodoApp API", Version = "v1" });
-    c.SwaggerDoc("v2", new() { Title = "TodoApp API", Version = "v2" });
-});
+builder.Services.AddSwaggerGen();
 
-// CORS
+// CORS (appsettings: Cors:Allowed -> string[])
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+    var origins = builder.Configuration.GetSection("Cors:Allowed").Get<string[]>() ?? Array.Empty<string>();
+    if (origins.Length == 0)
+    {
+        // geliştirme için gevşek; prod’da listeyi doldur
+        options.AddPolicy("Default", p => p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+    }
+    else
+    {
+        options.AddPolicy("Default", p => p.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod());
+    }
 });
 
 var app = builder.Build();
 
+// ===== Pipeline =====
 if (app.Environment.IsDevelopment())
 {
-    var apiVersionDescriptionProvider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
-    
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "TodoApp API v1");
+        c.SwaggerEndpoint("/swagger/v2/swagger.json", "TodoApp API v2");
         c.RoutePrefix = string.Empty;
-        foreach (var description in apiVersionDescriptionProvider.ApiVersionDescriptions)
-        {
-            c.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", 
-                $"TodoApp API {description.GroupName.ToUpperInvariant()}");
-        }
     });
 }
 
-// Serilog HTTP request logging
-app.UseSerilogRequestLogging();
+// Tek tip global hata yanıtı
+app.UseExceptionHandler(errApp =>
+{
+    errApp.Run(async ctx =>
+    {
+        var feature = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>();
+        var problem = new ProblemDetails
+        {
+            Title = "Internal Server Error",
+            Status = StatusCodes.Status500InternalServerError,
+            Detail = app.Environment.IsDevelopment() ? feature?.Error.Message : "Unexpected error",
+            Instance = ctx.Request.Path
+        };
+        ctx.Response.ContentType = "application/problem+json";
+        ctx.Response.StatusCode = problem.Status!.Value;
+        await ctx.Response.WriteAsJsonAsync(problem);
+    });
+});
+
+app.UseSerilogRequestLogging(); // request log’ları
 
 app.UseHttpsRedirection();
-
-app.UseCors("AllowAll");
-app.UseAuthorization();
-
+app.UseRouting();
+app.UseCors("Default");
 app.MapControllers();
 
-try
-{
-    Log.Information("Starting TodoApp API");
-    app.Run();
-}
-catch (Exception ex)
-{
-    Log.Fatal(ex, "Application terminated unexpectedly");
-}
-finally
-{
-    Log.CloseAndFlush();
-}
+app.Run();
