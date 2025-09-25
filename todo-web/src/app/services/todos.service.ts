@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { EMPTY, of } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { environment } from '../../environments/environment';
 
 export interface TodoDto {
   id: number;
@@ -70,7 +71,7 @@ export class TodosService {
   }
 
   loadAll() {
-    this.http.get<TodoDto[]>('/api/v1/todos').pipe(
+    this.http.get<TodoDto[]>(`${environment.apiBase}/todos`).pipe(
       tap(list => {
         const todos = (list ?? []).map(t => ({ ...t, notes: t.notes || [] }));
         this.todos.set(todos);
@@ -84,65 +85,27 @@ export class TodosService {
   }
 
   loadPaged(pageNumber: number = 1, pageSize: number = 10) {
-    this.http.get<PagedResult<TodoDto>>(`/api/v2/todos?pageNumber=${pageNumber}&pageSize=${pageSize}`).pipe(
-      tap(result => {
-        if (result) {
-          result.items = result.items.map(t => ({ ...t, notes: t.notes || [] }));
-        }
-        this.pagedTodos.set(result);
-        this.tick();
-      }),
-      catchError(err => {
-        this.snack.open(this.msg(err, 'Sayfalı todo listesi alınamadı'), 'Kapat', { duration: 1600 });
-        return of(null);
-      })
-    ).subscribe();
+    // Backend'de pagination yok, normal listeyi kullan
+    this.loadAll();
   }
 
   loadByCategory(categoryId: number) {
-    this.http.get<TodoDto[]>(`/api/v2/todos/by-category/${categoryId}`).pipe(
-      tap(list => {
-        const todos = (list ?? []).map(t => ({ ...t, notes: t.notes || [] }));
-        this.todos.set(todos);
-        this.tick();
-      }),
-      catchError(err => {
-        this.snack.open(this.msg(err, 'Kategoriye göre todo listesi alınamadı'), 'Kapat', { duration: 1600 });
-        return of([]);
-      })
-    ).subscribe();
+    // Backend'de category filter yok, client-side filter kullan
+    this.loadAll();
   }
 
   loadCompleted() {
-    this.http.get<TodoDto[]>('/api/v2/todos/completed').pipe(
-      tap(list => {
-        const todos = (list ?? []).map(t => ({ ...t, notes: t.notes || [] }));
-        this.todos.set(todos);
-        this.tick();
-      }),
-      catchError(err => {
-        this.snack.open(this.msg(err, 'Tamamlanan todo listesi alınamadı'), 'Kapat', { duration: 1600 });
-        return of([]);
-      })
-    ).subscribe();
+    // Backend'de completed filter yok, client-side filter kullan
+    this.loadAll();
   }
 
   loadPending() {
-    this.http.get<TodoDto[]>('/api/v2/todos/pending').pipe(
-      tap(list => {
-        const todos = (list ?? []).map(t => ({ ...t, notes: t.notes || [] }));
-        this.todos.set(todos);
-        this.tick();
-      }),
-      catchError(err => {
-        this.snack.open(this.msg(err, 'Bekleyen todo listesi alınamadı'), 'Kapat', { duration: 1600 });
-        return of([]);
-      })
-    ).subscribe();
+    // Backend'de pending filter yok, client-side filter kullan
+    this.loadAll();
   }
 
   add(dto: CreateTodoDto) {
-    this.http.post<TodoDto>('/api/v1/todos', dto).pipe(
+    this.http.post<TodoDto>(`${environment.apiBase}/todos`, dto).pipe(
       tap(created => {
         this.todos.set([created, ...this.todos()]);
         this.snack.open('Todo eklendi', 'Kapat', { duration: 1200 });
@@ -161,7 +124,7 @@ export class TodosService {
     this.todos.set(patched);
     this.tick();
 
-    this.http.put<TodoDto>(`/api/v1/todos/${id}`, dto).pipe(
+    this.http.put<TodoDto>(`${environment.apiBase}/todos/${id}`, dto).pipe(
       tap(updated => {
         const list = this.todos().map(t => t.id === id ? updated : t);
         this.todos.set(list);
@@ -199,7 +162,7 @@ export class TodosService {
     this.todos.set(after);
     this.tick();
 
-    this.http.delete<void>(`/api/v1/todos/${id}`).pipe(
+    this.http.delete<void>(`${environment.apiBase}/todos/${id}`).pipe(
       tap(() => {
         this.snack.open('Todo silindi', 'Kapat', { duration: 1200 });
         this.tick();
@@ -224,26 +187,12 @@ export class TodosService {
   }
 
   loadFiltered(categoryId?: number, done?: boolean, sort?: string, include = true) {
-    let url = '/api/v2/todos?include=' + include;
-    if (categoryId) url += '&categoryId=' + categoryId;
-    if (done !== undefined) url += '&done=' + done;
-    if (sort) url += '&sort=' + sort;
-
-    this.http.get<TodoDto[]>(url).pipe(
-      tap(list => {
-        const todos = (list ?? []).map(t => ({ ...t, notes: t.notes || [] }));
-        this.todos.set(todos);
-        this.tick();
-      }),
-      catchError(err => {
-        this.snack.open(this.msg(err, 'Filtrelenmiş todo listesi alınamadı'), 'Kapat', { duration: 1600 });
-        return of([]);
-      })
-    ).subscribe();
+    // Backend'de filter parametreleri yok, normal listeyi kullan
+    this.loadAll();
   }
 
   addNote(todoId: number, content: string) {
-    this.http.post<TodoNoteDto>(`/api/v2/todos/${todoId}/notes`, { content }).pipe(
+    this.http.post<TodoNoteDto>(`/api/todos/${todoId}/notes`, { content }).pipe(
       tap(note => {
         const selected = this.selectedTodo();
         if (selected && selected.id === todoId) {
@@ -261,7 +210,7 @@ export class TodosService {
   }
 
   removeNote(todoId: number, noteId: number) {
-    this.http.delete<void>(`/api/v2/todos/${todoId}/notes/${noteId}`).pipe(
+    this.http.delete<void>(`/api/todos/${todoId}/notes/${noteId}`).pipe(
       tap(() => {
         const selected = this.selectedTodo();
         if (selected && selected.id === todoId) {

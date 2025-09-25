@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { EMPTY, of } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { environment } from '../../environments/environment';
 
 export interface CategoryDto {
   id: number;
@@ -25,7 +26,7 @@ export class CategoriesService {
   }
 
   loadAll() {
-    this.http.get<CategoryDto[]>('/api/v2/categories').pipe(
+    this.http.get<CategoryDto[]>(`${environment.apiBase}/categories`).pipe(
       tap(list => {
         this.categories.set(list ?? []);
         this.tick();
@@ -44,7 +45,7 @@ export class CategoriesService {
     this.categories.set([optimistic, ...prev]);
     this.tick();
 
-    this.http.post<CategoryDto>('/api/v2/categories', { name, isActive: true }).pipe(
+    this.http.post<CategoryDto>(`${environment.apiBase}/categories`, { name, isActive: true }).pipe(
       tap(saved => {
         const withReal = [saved, ...prev];
         this.categories.set(withReal);
@@ -66,7 +67,7 @@ export class CategoriesService {
     this.categories.set(patched);
     this.tick();
 
-    this.http.put<CategoryDto>(`/api/v2/categories/${id}`, { name, isActive: true }).pipe(
+    this.http.put<CategoryDto>(`${environment.apiBase}/categories/${id}`, { name, isActive: true }).pipe(
       tap(() => {
         this.snack.open('Kategori güncellendi', 'Kapat', { duration: 1200 });
         this.tick();
@@ -86,7 +87,7 @@ export class CategoriesService {
     this.categories.set(after);
     this.tick();
 
-    this.http.delete<void>(`/api/v2/categories/${id}`).pipe(
+    this.http.delete<void>(`${environment.apiBase}/categories/${id}`).pipe(
       tap(() => {
         this.snack.open('Kategori silindi', 'Kapat', { duration: 1200 });
         this.tick();
@@ -103,7 +104,7 @@ export class CategoriesService {
   toggleStatus(id: number) {
     const prev = this.categories();
     
-    this.http.patch<CategoryDto>(`/api/v2/categories/${id}/toggle-status`, {}).pipe(
+    this.http.patch<CategoryDto>(`/api/categories/${id}/toggle-status`, {}).pipe(
       tap(updated => {
         const list = this.categories().map(c => c.id === id ? updated : c);
         this.categories.set(list);
